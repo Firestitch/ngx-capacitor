@@ -90,7 +90,7 @@ export class FsCapacitorHttp {
           });
 
           this._log(options, body, httpResponse);
-          document.cookie = response.headers['set-cookie'];
+          document.cookie = response.headers['Set-Cookie'] || response.headers['set-cookie'];
 
           return httpResponse;
         }),
