@@ -23,20 +23,30 @@ export class FsCapacitorHttp {
             from(this._convertFormData(request.body))
             .pipe(
               tap((body) => {
-                request.clone({ body })
+                request = request.clone({ body })
               })
             ) : 
             of(null);
         }),
         switchMap(() => {
+          const data = request.body || '';
           const headers = request.headers.keys()
             .filter((name) => typeof request.headers.get(name) === 'string')
             .reduce((accum, name) => {
+              const names = name.split('-')
+                .map((item) => {
+                  return item.charAt(0).toUpperCase() + item.slice(1);
+                });
+
               return {
                 ...accum,
-                [name]: request.headers.get(name),
+                [names.join('-')]: request.headers.get(name),
               };
             }, {});
+
+          if(typeof data === 'object') {
+            headers['Content-Type'] = 'application/json';
+          }
 
           const params = request.params.keys()
             .reduce((accum, name: string) => {
@@ -48,7 +58,7 @@ export class FsCapacitorHttp {
 
           return this._sendRequest(request.url, {
             method: request.method.toUpperCase(),
-            data: request.body || '',
+            data,
             params,
             headers: {
               ...headers,
