@@ -46,12 +46,12 @@ export class FsCapacitorHttp {
     // }
 
     let data = request.body || '';
-    if(serializer === 'json') {
+    if (serializer === 'json') {
       data = data || {};
     }
 
     return this._sendRequest(request.url, {
-      method: request.method.toLowerCase(),
+      method: request.method.toUpperCase(),
       data,
       params,
       headers: {
@@ -94,7 +94,7 @@ export class FsCapacitorHttp {
 
           return httpResponse;
         }),
-        catchError((error)=> {
+        catchError((error) => {
           if (error.status <= 0) {
             const errorResponse = new HttpErrorResponse({
               ...error,
@@ -106,7 +106,7 @@ export class FsCapacitorHttp {
             let body = error.error;
             try {
               body = JSON.parse(error.error);
-            } catch(e) {}
+            } catch (e) { }
 
             const httpResponse = new HttpResponse({
               body,
@@ -115,7 +115,7 @@ export class FsCapacitorHttp {
               url: error.url,
             });
 
-            if(!httpResponse.status || httpResponse.status >= 400) {
+            if (!httpResponse.status || httpResponse.status >= 400) {
               const errorResponse = new HttpErrorResponse({
                 error: httpResponse.body,
                 headers: httpResponse.headers,
@@ -123,8 +123,8 @@ export class FsCapacitorHttp {
                 statusText: httpResponse.statusText,
                 url: httpResponse.url,
               });
-              
-                this._log(options, httpResponse.body, errorResponse);
+
+              this._log(options, httpResponse.body, errorResponse);
             }
             this._log(options, httpResponse.body, httpResponse);
           }
@@ -145,7 +145,7 @@ export class FsCapacitorHttp {
     const status: number = httpResponse?.status || 0;
     const log = [`${options.method.toUpperCase()} ${status}`, _url.toString(), options.data || ''];
 
-    if(httpResponse) {
+    if (httpResponse) {
       log.push(...[
         status,
         options.headers,
@@ -161,7 +161,7 @@ export class FsCapacitorHttp {
       ]);
     }
 
-    if(!status || status >= 400) {
+    if (!status || status >= 400) {
       console.error(...log);
     } else {
       console.log(...log);
@@ -169,11 +169,11 @@ export class FsCapacitorHttp {
   }
 
   private _getSerializer(request: HttpRequest<any>) {
-    if(request.body instanceof FormData) {
+    if (request.body instanceof FormData) {
       return 'multipart';
     }
 
-    if(typeof(request.body) === 'object') {
+    if (typeof (request.body) === 'object') {
       return 'json';
     }
 
