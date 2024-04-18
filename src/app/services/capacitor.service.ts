@@ -80,7 +80,7 @@ export class FsCapacitor {
       return of(null);
     }
 
-    return new Observable((observer) => {
+    return new Observable<any>((observer) => {
       if(this.cordova) {
         observer.next(this.cordova);
         observer.complete();
@@ -93,14 +93,6 @@ export class FsCapacitor {
       });
     })
       .pipe(
-        switchMap((cordova: any) => new Observable<void>((observer) => {
-          const channel = cordova.require('cordova/channel');
-          channel.onCordovaReady
-            .subscribe(() => {
-              observer.next();
-              observer.complete();
-            });
-        })),
         tap(() => {
           this.state = CordovaState.Ready;
         }),
