@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
 
 import { CapacitorHttp, HttpOptions } from '@capacitor/core';
-import { from, Observable, throwError } from 'rxjs';
+import { from, Observable, of, throwError } from 'rxjs';
 
 import { HttpErrorResponse, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase } from '@angular/common/http';
 
-import { catchError, map } from 'rxjs/operators';
+import { CapFormDataEntry } from '@capacitor/core/types/definitions-internal';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { RequestOptions } from '../interfaces';
 
 
@@ -15,52 +16,82 @@ import { RequestOptions } from '../interfaces';
 export class FsCapacitorHttp {
 
   public sendRequest(request: HttpRequest<any>): any {
-    const headers = request.headers.keys()
-      .filter((name) => typeof request.headers.get(name) === 'string')
-      .reduce((accum, name) => {
-        return {
-          ...accum,
-          [name]: request.headers.get(name),
-        };
-      }, {});
+    return of(null)
+      .pipe(
+        switchMap(() => {
+          return request.body instanceof FormData ?
+            from(this._convertFormData(request.body))
+            .pipe(
+              tap((body) => {
+                request.clone({ body })
+              })
+            ) : 
+            of(null);
+        }),
+        switchMap(() => {
+          const headers = request.headers.keys()
+            .filter((name) => typeof request.headers.get(name) === 'string')
+            .reduce((accum, name) => {
+              return {
+                ...accum,
+                [name]: request.headers.get(name),
+              };
+            }, {});
 
-    const params = request.params.keys()
-      .reduce((accum, name: string) => {
-        return {
-          ...accum,
-          [name]: request.params.get(name),
-        };
-      }, {});
+          const params = request.params.keys()
+            .reduce((accum, name: string) => {
+              return {
+                ...accum,
+                [name]: request.params.get(name),
+              };
+            }, {});
 
-    const serializer = this._getSerializer(request);
-
-    // if(request.body instanceof FormData) {
-    //   const formData = new FormData();
-
-    //   request.body
-    //     .forEach((value, name) => {
-    //       formData.append(name, value);
-    //     });
-
-    //   request = request.clone({ body: formData });
-    // }
-
-    let data = request.body || '';
-    if (serializer === 'json') {
-      data = data || {};
-    }
-
-    return this._sendRequest(request.url, {
-      method: request.method.toUpperCase(),
-      data,
-      params,
-      headers: {
-        ...headers,
-        ['Cookie']: document.cookie,
-      },
-      serializer,
-    });
+          return this._sendRequest(request.url, {
+            method: request.method.toUpperCase(),
+            data: request.body || '',
+            params,
+            headers: {
+              ...headers,
+              ['Cookie']: document.cookie,
+            },
+          })
+        }) 
+      );
   }
+
+  private async _convertFormData(formData: any): Promise<any> {
+    const newFormData: CapFormDataEntry[] = [];
+    for (const pair of formData.entries()) {
+      const [key, value] = pair;
+      if (value instanceof File) {
+        const base64File = await this._readFileAsBase64(value);
+        newFormData.push({
+          key,
+          value: base64File,
+          type: 'base64File',
+          contentType: value.type,
+          fileName: value.name,
+        });
+      } else {
+        newFormData.push({ key, value, type: 'string' });
+      }
+    }
+  
+    return newFormData;
+  }
+
+  private _readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const data = reader.result as string;
+        resolve(btoa(data));
+      };
+      reader.onerror = reject;
+  
+      reader.readAsBinaryString(file);
+    });
+  }  
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
     const httpOptions: HttpOptions = {
