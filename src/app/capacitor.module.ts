@@ -1,14 +1,14 @@
 import { ModuleWithProviders, NgModule } from '@angular/core';
 
 import { FS_CORDOVA_CONFIG } from './consts';
-import { FsCordovaConfig } from './interfaces';
+import { FsCapacitorConfig } from './interfaces';
 
 
 @NgModule()
-export class FsCordovaModule {
-  public static forRoot(config: FsCordovaConfig = {}): ModuleWithProviders<FsCordovaModule> {
+export class FsCapacitorModule {
+  public static forRoot(config: FsCapacitorConfig = {}): ModuleWithProviders<FsCapacitorModule> {
     return {
-      ngModule: FsCordovaModule,
+      ngModule: FsCapacitorModule,
       providers:[
         { provide: FS_CORDOVA_CONFIG, useValue: config },
       ],

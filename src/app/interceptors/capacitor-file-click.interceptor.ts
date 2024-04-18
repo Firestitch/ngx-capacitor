@@ -1,11 +1,11 @@
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 
-import { InputProcessorService, FileClickHandler, FileClickInterceptor } from '@firestitch/file';
+import { FileClickHandler, FileClickInterceptor, InputProcessorService } from '@firestitch/file';
 
-import { hasCordovaCameraSupport } from '../helpers';
-import { CordovaCameraFileService, FsCordova } from '../services';
-import { tap } from 'rxjs/operators';
 import { NgZone } from '@angular/core';
+import { tap } from 'rxjs/operators';
+import { hasCordovaCameraSupport } from '../helpers';
+import { CordovaCameraFileService } from '../services';
 
 
 export class CordovaFileClickInterceptor extends FileClickInterceptor {

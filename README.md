@@ -1,10 +1,10 @@
 # Installation
 
-1. Call initCordova() in main.ts
+1. Call initCapacitor() in main.ts. This has to be revisited
 ```
-import { initCordova } from '@firestitch/cordova';
+import { initCapacitor } from '@firestitch/capacitor';
 
-initCordova();
+initCapacitor();
 ```
 
 2. Provide the HTTP_INTERCEPTORS in the main module 
@@ -13,15 +13,15 @@ initCordova();
   provide: HTTP_INTERCEPTORS,
   useClass: CordovaHttpInterceptor,
   multi: true,
-  deps: [Platform, FsCordovaHttp],
+  deps: [Platform, FsCapacitorHttp],
 },
 ```
 
-3. Call FsCordova.init() 
+3. Call FsCapacitor.init() 
 ```
 {
   provide: APP_INITIALIZER,
-  useFactory: (cordova: FsCordova) => () => {
+  useFactory: (cordova: FsCapacitor) => () => {
     return of(null)
       .pipe(
         switchMap(() => cordova.init()),
@@ -29,6 +29,6 @@ initCordova();
       .toPromise();
   },
   multi: true,
-  deps: [FsCordova],
+  deps: [FsCapacitor],
 }, 
 ```

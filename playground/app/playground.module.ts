@@ -11,11 +11,10 @@ import { FsStoreModule } from '@firestitch/store';
 
 
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
-import { CordovaFileClickInterceptor, CordovaHttpInterceptor, FsCordova, FsCordovaHttp } from '@firestitch/cordova';
+import { CapacitorHttpInterceptor, CordovaFileClickInterceptor, FsCapacitor, FsCapacitorHttp } from '@firestitch/capacitor';
 import { FS_FILE_CLICK_INTERCEPTOR } from '@firestitch/file';
 import { of } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
-import { FsCordovaModule } from 'src/app/cordova.module';
 import { AppComponent } from './app.component';
 import {
   CordovaComponent,
@@ -38,7 +37,6 @@ const routes: Routes = [
     FsLabelModule,
     FsStoreModule.forRoot(),
     FsExampleModule.forRoot(),
-    FsCordovaModule.forRoot(),
     FsMessageModule.forRoot(),
     RouterModule.forRoot(routes),
   ],
@@ -51,15 +49,15 @@ const routes: Routes = [
     {
       provide: APP_INITIALIZER,
       useFactory: (
-        cordova: FsCordova,
+        capacitor: FsCapacitor,
       ) => () => {
         return of(null)
           .pipe(
-            switchMap(() => cordova.getAppVersion()),
+            switchMap(() => capacitor.getAppVersion()),
             tap((version: string) => {
               console.log('Cordova Version', version);
             }),
-            switchMap(() => cordova.init()
+            switchMap(() => capacitor.init()
               .pipe(
                 catchError(() => of(null))
               )
@@ -68,13 +66,13 @@ const routes: Routes = [
           .toPromise();
       },
       multi: true,
-      deps: [FsCordova],
+      deps: [FsCapacitor],
     },    
     {
       provide: HTTP_INTERCEPTORS,
-      useClass: CordovaHttpInterceptor,
+      useClass: CapacitorHttpInterceptor,
       multi: true,
-      deps: [FsCordova, FsCordovaHttp],
+      deps: [FsCapacitor, FsCapacitorHttp],
     },
     {
       provide: FS_FILE_CLICK_INTERCEPTOR,

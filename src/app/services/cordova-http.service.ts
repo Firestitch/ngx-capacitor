@@ -10,7 +10,7 @@ import { RequestOptions } from '../interfaces';
 @Injectable({
   providedIn: 'root',
 })
-export class FsCordovaHttp {
+export class FsCapacitorHttp {
 
   public get http(): any {
     const cordova = (window as any).cordova;

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 
-import { FsStore } from '@firestitch/store';
 import { parse } from '@firestitch/date';
+import { FsStore } from '@firestitch/store';
 
 import { isAfter, isBefore } from 'date-fns';
 import setCookie from 'set-cookie-parser';
@@ -10,7 +10,7 @@ import setCookie from 'set-cookie-parser';
 @Injectable({
   providedIn: 'root',
 })
-export class FsCordovaCookie {
+export class FsCapacitorCookie {
 
   private _cookies = [];
 

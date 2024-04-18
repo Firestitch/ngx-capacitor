@@ -8,7 +8,7 @@ import { Platform } from '@ionic/angular';
 import { CordovaState } from '../enums';
 import { getCordova } from '../helpers';
 
-import { FsCordovaCookie } from './cordova-cookie.service';
+import { FsCapacitorCookie } from './capacitor-cookie.service';
 
 const NativeFile = window.File;
 const NativeFileReader = window.FileReader;
@@ -17,7 +17,7 @@ const NativeFileReader = window.FileReader;
 @Injectable({
   providedIn: 'root',
 })
-export class FsCordova {
+export class FsCapacitor {
 
   public CordovaFile;
   public CordovaFileReader;
@@ -26,7 +26,7 @@ export class FsCordova {
 
   constructor(
     private _platform: Platform,
-    private _cordovaCookie: FsCordovaCookie,
+    private _capacitorCookie: FsCapacitorCookie,
   ) {}
 
   public get ready$(): Observable<any> {
@@ -122,7 +122,7 @@ export class FsCordova {
           console.log('Cordova Service init() ready');
         }),
         tap(() => this._initFile()),
-        tap(() => this._cordovaCookie.init()),
+        tap(() => this._capacitorCookie.init()),
         tap(() => this._initInsets()),
       );
   }

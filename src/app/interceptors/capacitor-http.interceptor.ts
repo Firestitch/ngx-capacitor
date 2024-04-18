@@ -7,17 +7,17 @@ import {
   HttpEvent, HttpHandler, HttpInterceptor, HttpRequest,
 } from '@angular/common/http';
 
-import { FsCordova, FsCordovaHttp } from '../services';
+import { FsCapacitor, FsCapacitorHttp } from '../services';
 
 
 @Injectable()
 export class CapacitorHttpInterceptor implements HttpInterceptor {
   constructor(
-    private _cordova: FsCordova,
-    private _cordovaHttp: FsCordovaHttp,
+    private _capacitor: FsCapacitor,
+    private _capacitorHttp: FsCapacitorHttp,
   ) {}
 
   public intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    return this._cordova.ready ? this._cordovaHttp.sendRequest(request) : next.handle(request);
+    return this._capacitor.ready ? this._capacitorHttp.sendRequest(request) : next.handle(request);
   }
 }
