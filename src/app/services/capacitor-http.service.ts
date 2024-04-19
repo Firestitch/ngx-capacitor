@@ -35,7 +35,7 @@ export class FsCapacitorHttp {
             formDataToMultipartArray(request.body)
               .pipe(
                 tap((body) => {
-                  request = request.clone({ body: JSON.stringify(body) });
+                  request = request.clone({ body });
                 })
               ) : 
               of(null);
