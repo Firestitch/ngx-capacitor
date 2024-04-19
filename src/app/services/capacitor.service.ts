@@ -8,6 +8,7 @@ import { Platform } from '@ionic/angular';
 import { CordovaState } from '../enums';
 import { getCordova } from '../helpers';
 
+import { Capacitor } from '@capacitor/core';
 import { FsCapacitorCookie } from './capacitor-cookie.service';
 
 const NativeFile = window.File;
@@ -52,7 +53,7 @@ export class FsCapacitor {
   }
 
   public get state(): CordovaState {
-    return this.window.cordovaState;
+    return this.window.cordovaState || CordovaState.Unsupported;
   }
 
   public set state(value: CordovaState) {
@@ -65,6 +66,10 @@ export class FsCapacitor {
 
   public get ready(): boolean {
     return this.state === CordovaState.Ready;
+  }
+
+  public get supported(): boolean {
+    return Capacitor.isNativePlatform();
   }
 
   public get unsupported(): boolean {

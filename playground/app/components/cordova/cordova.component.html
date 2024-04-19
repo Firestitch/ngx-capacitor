@@ -1,0 +1,34 @@
+<form method="post" #form>
+  <Input name="name" label="Name" />
+
+  <textarea name="description" label="Description"></textarea>
+
+  <Input name="file" type="file" />
+  <Input name="tags[0]" placeholder="tag" />
+  <Input name="tags[1]" placeholder="tag" />
+  <Input name="tags[2]" placeholder="tag" />
+
+  <Input type="number" name="nutrition[caloriesPerServing]" label="Calories per Serving" />
+
+  <Input type="number" name="nutrition[servingsPerContainer]" label="Number of Servings" />
+
+  <div>
+      <Input name="nutrition[servingSizes][0][amount]" placeholder="amount" />
+      <Input name="nutrition[servingSizes][1][measurement][name]" placeholder="name, e.g. 'grams'" />
+      <Input name="nutrition[servingSizes][2][measurement][symbol]" placeholder="symbol, shorthand e.g. 'g'" />
+  </div>
+
+  <div>
+      <Input name="nutrition[servingSizes][1][amount]" placeholder="amount" />
+      <Input name="nutrition[servingSizes][1][measurement][name]" placeholder="name, e.g. 'grams'" />
+      <Input name="nutrition[servingSizes][1][measurement][symbol]" placeholder="symbol, shorthand e.g. 'g'" />
+  </div>
+
+  <div>
+      <Input name="nutrition[servingSizes][2][amount" placeholder="amount" />
+      <Input name="nutrition[servingSizes][2][measurement][name]" placeholder="name, e.g. 'grams'" />
+      <Input name="nutrition[servingSizes][2][measurement][symbol]" placeholder="symbol, shorthand e.g. 'g'" />
+  </div>
+
+  <Button (click)="submit()">Submit</Button>
+</form>

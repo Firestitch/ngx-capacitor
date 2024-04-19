@@ -14,7 +14,7 @@ import { HTTP_INTERCEPTORS } from '@angular/common/http';
 import { CapacitorHttpInterceptor, CordovaFileClickInterceptor, FsCapacitor, FsCapacitorHttp } from '@firestitch/capacitor';
 import { FS_FILE_CLICK_INTERCEPTOR } from '@firestitch/file';
 import { of } from 'rxjs';
-import { catchError, switchMap, tap } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 import { AppComponent } from './app.component';
 import {
   CordovaComponent,
@@ -57,13 +57,8 @@ const routes: Routes = [
             tap((version: string) => {
               console.log('Cordova Version', version);
             }),
-            switchMap(() => capacitor.init()
-              .pipe(
-                catchError(() => of(null))
-              )
-            ),
-          )
-          .toPromise();
+            //switchMap(() => capacitor.init()),
+          );
       },
       multi: true,
       deps: [FsCapacitor],
