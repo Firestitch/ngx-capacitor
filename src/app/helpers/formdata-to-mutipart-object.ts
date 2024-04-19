@@ -1,5 +1,4 @@
 import { forkJoin, Observable, of } from "rxjs";
-import { map } from "rxjs/operators";
 
 
 export function formDataToMultipartObject<TModel>(formData: FormData): Observable<any> {
@@ -13,9 +12,6 @@ export function formDataToMultipartObject<TModel>(formData: FormData): Observabl
               _readFileAsBase64(formData.get(name) as Blob)
             : of(formData.get(name))
             )
-              .pipe(
-                map((value) => ({ name, value}))
-              )
         };
       }, {})
     );
