@@ -1,5 +1,6 @@
 export * from './cordova-supported';
 export * from './cordova';
+export * from './formdata-to-mutipart-array';
 export * from './formdata-to-mutipart-object';
 export * from './formdata-to-object';
 export * from './get-cordova-camera';

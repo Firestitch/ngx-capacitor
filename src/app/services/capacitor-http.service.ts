@@ -6,7 +6,7 @@ import { from, Observable, of, throwError } from 'rxjs';
 import { HttpErrorResponse, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase } from '@angular/common/http';
 
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
-import { formDataToMultipartObject } from '../helpers';
+import { formDataToMultipartArray } from '../helpers';
 import { RequestOptions } from '../interfaces';
 
 
@@ -16,6 +16,8 @@ import { RequestOptions } from '../interfaces';
 export class FsCapacitorHttp {
 
   public sendRequest(request: HttpRequest<any>): any {
+    const dataType = request.body instanceof FormData ? 'formData' : null;
+
     return of(null)
       .pipe(
         tap(() => {
@@ -23,14 +25,14 @@ export class FsCapacitorHttp {
             const headers = request.headers.set('Content-Type', 'multipart/form-data');
             request = request.clone({ headers });
              
-          } else if(typeof request.body === 'object') {
+          } else if(request.headers.get('Content-Type') === 'text/json') {
             const headers = request.headers.set('Content-Type', 'application/json');
             request = request.clone({ headers });
           }
         }),
         switchMap(() => {
           return request.body instanceof FormData ?
-            formDataToMultipartObject(request.body)
+            formDataToMultipartArray(request.body)
               .pipe(
                 tap((body) => {
                   request = request.clone({ body: JSON.stringify(body) });
@@ -70,6 +72,7 @@ export class FsCapacitorHttp {
               ...headers,
               ['Cookie']: document.cookie,
             },
+            dataType,
           })
         }) 
       );
@@ -82,6 +85,7 @@ export class FsCapacitorHttp {
       data: options.data,
       params: options.params,
       headers: options.headers,
+      dataType: options.dataType,
     }
 
     return from(CapacitorHttp.request(httpOptions))
