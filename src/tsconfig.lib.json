@@ -14,7 +14,8 @@
     "types": [],
     "lib": [
       "dom",
-      "es2015"
+      "DOM.Iterable",
+      "es2020"
     ]
   },
   "angularCompilerOptions": {

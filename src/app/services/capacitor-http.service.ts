@@ -5,8 +5,8 @@ import { from, Observable, of, throwError } from 'rxjs';
 
 import { HttpErrorResponse, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase } from '@angular/common/http';
 
-import { CapFormDataEntry } from '@capacitor/core/types/definitions-internal';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
+import { formDataToMultipartObject } from '../helpers';
 import { RequestOptions } from '../interfaces';
 
 
@@ -18,15 +18,25 @@ export class FsCapacitorHttp {
   public sendRequest(request: HttpRequest<any>): any {
     return of(null)
       .pipe(
+        tap(() => {
+          if(request.body instanceof FormData) {
+            const headers = request.headers.set('Content-Type', 'multipart/form-data');
+            request = request.clone({ headers });
+             
+          } else if(typeof request.body === 'object') {
+            const headers = request.headers.set('Content-Type', 'application/json');
+            request = request.clone({ headers });
+          }
+        }),
         switchMap(() => {
           return request.body instanceof FormData ?
-            from(this._convertFormData(request.body))
-            .pipe(
-              tap((body) => {
-                request = request.clone({ body })
-              })
-            ) : 
-            of(null);
+            formDataToMultipartObject(request.body)
+              .pipe(
+                tap((body) => {
+                  request = request.clone({ body: JSON.stringify(body) });
+                })
+              ) : 
+              of(null);
         }),
         switchMap(() => {
           const data = request.body || '';
@@ -43,10 +53,6 @@ export class FsCapacitorHttp {
                 [names.join('-')]: request.headers.get(name),
               };
             }, {});
-
-          if(typeof data === 'object') {
-            headers['Content-Type'] = 'application/json';
-          }
 
           const params = request.params.keys()
             .reduce((accum, name: string) => {
@@ -68,40 +74,6 @@ export class FsCapacitorHttp {
         }) 
       );
   }
-
-  private async _convertFormData(formData: any): Promise<any> {
-    const newFormData: CapFormDataEntry[] = [];
-    for (const pair of formData.entries()) {
-      const [key, value] = pair;
-      if (value instanceof File) {
-        const base64File = await this._readFileAsBase64(value);
-        newFormData.push({
-          key,
-          value: base64File,
-          type: 'base64File',
-          contentType: value.type,
-          fileName: value.name,
-        });
-      } else {
-        newFormData.push({ key, value, type: 'string' });
-      }
-    }
-  
-    return newFormData;
-  }
-
-  private _readFileAsBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const data = reader.result as string;
-        resolve(btoa(data));
-      };
-      reader.onerror = reject;
-  
-      reader.readAsBinaryString(file);
-    });
-  }  
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
     const httpOptions: HttpOptions = {

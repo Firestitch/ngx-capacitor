@@ -1,4 +1,5 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
+import { formDataToMultipartObject } from '@firestitch/capacitor';
 
 
 @Component({
@@ -19,16 +20,12 @@ export class CordovaComponent {
     const formData: FormData = new FormData(this.form.nativeElement);
 
     const x = Object.fromEntries(formData);
-    debugger;
+    console.log(x);
 
-    formData.forEach((value, key) => {
-     
-    });
-
-    //  formDataToObject(formData)
-    // .subscribe((object) => {
-    //   console.log(object);
-    // });    
+    formDataToMultipartObject(formData)
+    .subscribe((object) => {
+      console.log(object);
+    });    
   }
 
 
