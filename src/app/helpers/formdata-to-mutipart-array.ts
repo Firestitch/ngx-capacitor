@@ -34,7 +34,7 @@ function _readFileAsBase64(file: Blob): Observable<string> {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = function () {
-      observer.next(reader.result as string);
+      observer.next((reader.result as string).substr((reader.result as string).indexOf(',') + 1));
       observer.complete();
     };
     
