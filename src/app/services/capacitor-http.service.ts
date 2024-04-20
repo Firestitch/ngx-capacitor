@@ -5,6 +5,7 @@ import { from, Observable, of, throwError } from 'rxjs';
 
 import { HttpErrorResponse, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase } from '@angular/common/http';
 
+import { guid } from '@firestitch/common';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { formDataToMultipartArray } from '../helpers';
 import { RequestOptions } from '../interfaces';
@@ -22,7 +23,7 @@ export class FsCapacitorHttp {
       .pipe(
         tap(() => {
           if(request.body instanceof FormData) {
-            const headers = request.headers.set('Content-Type', 'multipart/form-data');
+            const headers = request.headers.set('Content-Type', `multipart/form-data; boundary=-----------------------------${guid()}`);
             request = request.clone({ headers });
              
           } else if(request.headers.get('Content-Type') === 'text/json') {
