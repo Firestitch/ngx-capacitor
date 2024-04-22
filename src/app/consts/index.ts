@@ -1,1 +1,1 @@
-export * from './cordova-config';
+export * from './capacitor-config';
