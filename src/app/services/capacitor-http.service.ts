@@ -92,12 +92,17 @@ export class FsCapacitorHttp {
     return from(CapacitorHttp.request(httpOptions))
       .pipe(
         map((response) => {
-          let body;
+          let body = response.data;
 
-          try {
-            body = JSON.parse(response.data);
-          } catch (error) {
-            body = response.data;
+          const contentType = (response.headers['Content-Type'] || '').split(';')[0];
+          if(contentType.match(/\/json/)) {
+            try {
+              body = JSON.parse(response.data);
+            } catch (error) {
+            }
+          } else if(response.headers['Content-Transfer-Encoding'] === 'binary') {
+            const uint8Array = Uint8Array.from(body as string, (c) => c.charCodeAt(0)); 
+            body = new Blob([uint8Array], { type: contentType });  
           }
 
           const httpResponse = new HttpResponse({
