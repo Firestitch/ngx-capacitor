@@ -4,5 +4,6 @@ export interface RequestOptions {
   data: any;
   params: { [key: string]: string };
   headers: { [key: string]: string };
-  dataType?: 'formData'
+  dataType?: 'formData',
+  responseType?: 'arraybuffer' | 'blob' | 'json' | 'text' | 'document'
 }

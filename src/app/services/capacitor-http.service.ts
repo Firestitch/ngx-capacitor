@@ -74,10 +74,34 @@ export class FsCapacitorHttp {
               ['Cookie']: document.cookie,
             },
             dataType,
+            responseType: request.responseType,
           })
         }) 
       );
   }
+
+  private _base64toBlob(b64Data, contentType) {
+    const sliceSize = 512;
+
+    var byteCharacters = atob(b64Data);
+    var byteArrays = [];
+
+    for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      var slice = byteCharacters.slice(offset, offset + sliceSize);
+
+      var byteNumbers = new Array(slice.length);
+      for (var i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+  
+      var byteArray = new Uint8Array(byteNumbers);
+  
+      byteArrays.push(byteArray);
+    }
+  
+    var blob = new Blob(byteArrays, { type: contentType });
+    return blob;
+  };
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
     const httpOptions: HttpOptions = {
@@ -87,6 +111,7 @@ export class FsCapacitorHttp {
       params: options.params,
       headers: options.headers,
       dataType: options.dataType,
+      responseType: options.responseType,
     }
 
     return from(CapacitorHttp.request(httpOptions))
@@ -100,9 +125,9 @@ export class FsCapacitorHttp {
               body = JSON.parse(response.data);
             } catch (error) {
             }
-          } else if(response.headers['Content-Transfer-Encoding'] === 'binary') {
-            const uint8Array = Uint8Array.from(body as string, (c) => c.charCodeAt(0)); 
-            body = new Blob([uint8Array], { type: contentType });  
+  
+          } else if(options.responseType === 'blob') {
+            body = this._base64toBlob(body, contentType);
           }
 
           const httpResponse = new HttpResponse({
