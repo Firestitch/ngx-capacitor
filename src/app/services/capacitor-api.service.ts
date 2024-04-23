@@ -33,7 +33,8 @@ export class FsCapacitorApi extends FsApi {
               })
             )
           }),
-        );
+        )
+        .subscribe();
     }
 
     super.download(name, method, url, data);
