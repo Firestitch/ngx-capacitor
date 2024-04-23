@@ -8,9 +8,7 @@ import { from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable()
 export class FsCapacitorApi extends FsApi {
 
   public download(name: string, method: any, url: string, data?: any): void {

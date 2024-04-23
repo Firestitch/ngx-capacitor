@@ -1,4 +1,4 @@
-import { NgModule, NgZone } from '@angular/core';
+import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -10,8 +10,8 @@ import { FsMessageModule } from '@firestitch/message';
 import { FsStoreModule } from '@firestitch/store';
 
 
-import { CordovaFileClickInterceptor, FsCapacitorModule } from '@firestitch/capacitor';
-import { FS_FILE_CLICK_INTERCEPTOR } from '@firestitch/file';
+import { FsApiModule } from '@firestitch/api';
+import { FsCapacitorModule } from '@firestitch/capacitor';
 import { AppComponent } from './app.component';
 import {
   CordovaComponent,
@@ -32,6 +32,7 @@ const routes: Routes = [
     AppMaterialModule,
     FormsModule,
     FsLabelModule,
+    FsApiModule.forRoot(),
     FsStoreModule.forRoot(),
     FsExampleModule.forRoot(),
     FsMessageModule.forRoot(),
@@ -45,29 +46,13 @@ const routes: Routes = [
   ],
   providers: [
     // {
-    //   provide: APP_INITIALIZER,
-    //   useFactory: (
-    //     capacitor: FsCapacitor,
-    //   ) => () => {
-    //     return of(null)
-    //       .pipe(
-    //         switchMap(() => capacitor.getAppVersion()),
-    //         tap((version: string) => {
-    //           console.log('Cordova Version', version);
-    //         }),
-    //       );
-    //   },
+    //   provide: FS_FILE_CLICK_INTERCEPTOR,
     //   multi: true,
-    //   deps: [FsCapacitor],
-    // },    
-    {
-      provide: FS_FILE_CLICK_INTERCEPTOR,
-      multi: true,
-      useFactory: (ngZone: NgZone) => {
-        return new CordovaFileClickInterceptor(ngZone);
-      },
-      deps: [NgZone],
-    },
+    //   useFactory: (ngZone: NgZone) => {
+    //     return new CordovaFileClickInterceptor(ngZone);
+    //   },
+    //   deps: [NgZone],
+    // },
   ]
 })
 export class PlaygroundModule {
