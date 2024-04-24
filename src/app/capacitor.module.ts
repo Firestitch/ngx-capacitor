@@ -3,7 +3,7 @@ import { APP_INITIALIZER, ModuleWithProviders, NgModule } from '@angular/core';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 import { FsApi } from '@firestitch/api';
 import { of } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { switchMap } from 'rxjs/operators';
 import { FS_CAPACITOR_CONFIG } from './consts';
 import { CapacitorHttpInterceptor } from './interceptors';
 import { FsCapacitorConfig } from './interfaces';
@@ -31,10 +31,9 @@ export class FsCapacitorModule {
           ) => {
             return () => of(null)
               .pipe(
-                tap(() => {
-                  if(capacitor.supported) {
-                    capacitor.init();
-                  }
+                switchMap(() => {
+                  return capacitor.supported ?
+                    capacitor.init() : of(null);
                 }),
               );
           },
