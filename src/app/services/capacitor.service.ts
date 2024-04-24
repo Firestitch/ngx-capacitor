@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import { from, Observable, of, throwError } from 'rxjs';
-import { switchMap, tap } from 'rxjs/operators';
+import { tap } from 'rxjs/operators';
 
 import { Platform } from '@ionic/angular';
 
@@ -31,17 +31,7 @@ export class FsCapacitor {
   ) {}
 
   public get ready$(): Observable<any> {
-    if(this._ready) {
-      return of(true);
-    }
-
-    return from(this._platform.ready())
-      .pipe(
-        switchMap(() => this._cordovaReady()),
-        tap(() => {
-          this._ready = true;
-        }),
-      );
+    return of(true);
   }
 
   public get resume$(): Observable<void> {
