@@ -110,21 +110,8 @@ export class FsCapacitor {
         }),
         tap(() => this._initFile()),
         tap(() => this._capacitorCookie.init()),
-        //tap(() => this._initInsets()),
       );
   }
-
-  // private _initInsets() {
-  //   if(this.window.totalpave) {
-  //     this.window.totalpave.Insets.addListener((insets) => {
-  //       const root: any = document.querySelector(':root');
-  //       root.style.setProperty('--safe-area-inset-top', `${insets.top}px`);
-  //       root.style.setProperty('--safe-area-inset-right', `${insets.right}px`);
-  //       root.style.setProperty('--safe-area-inset-bottom', `${insets.bottom}px`);
-  //       root.style.setProperty('--safe-area-inset-left', `${insets.left}px`);
-  //     });
-  //   }
-  // }
 
   /**
    * Restored the File/FileReader object from cordova-plugin-file overriding it

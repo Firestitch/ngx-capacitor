@@ -191,7 +191,7 @@ export class FsCapacitorHttp {
       });
 
     const status: number = httpResponse?.status || 0;
-    const log = [`${options.method.toUpperCase()} ${status}`, _url.toString(), options.data || ''];
+    const log = [options.method.toUpperCase() + ' ' + status, _url.toString(), options.data || ''];
 
     if (httpResponse) {
       log.push(...[
