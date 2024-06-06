@@ -4,8 +4,7 @@ import { parse } from '@firestitch/date';
 import { FsStore } from '@firestitch/store';
 
 import { isAfter, isBefore } from 'date-fns';
-import setCookie from 'set-cookie-parser';
-
+import { cookieParse } from '../helpers';
 
 @Injectable({
   providedIn: 'root',
@@ -34,7 +33,7 @@ export class FsCapacitorCookie {
     path?: string;
     value?: string;
   }[] {
-    return setCookie.parse(setCookie.splitCookiesString(cookieStr));
+    return (cookieParse.splitCookiesString(cookieStr));
   }
 
   public polyfillCookie() {

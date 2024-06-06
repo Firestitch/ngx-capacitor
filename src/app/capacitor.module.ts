@@ -1,6 +1,7 @@
 import { APP_INITIALIZER, ModuleWithProviders, NgModule } from '@angular/core';
 
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
+import { Capacitor } from '@capacitor/core';
 import { FsApi } from '@firestitch/api';
 import { of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -32,7 +33,7 @@ export class FsCapacitorModule {
             return () => of(null)
               .pipe(
                 switchMap(() => {
-                  return capacitor.supported ?
+                  return Capacitor.getPlatform() === 'ios' ?
                     capacitor.init() : of(null);
                 }),
               );

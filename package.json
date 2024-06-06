@@ -86,7 +86,6 @@
     "node": ">=10.0.0"
   },
   "dependencies": {
-    "set-cookie-parser": "^2.6.0",
     "@capacitor/core": "^6.0.0",
     "@ionic/angular": "^6.7.3"
   }

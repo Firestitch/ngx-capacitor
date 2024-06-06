@@ -5,7 +5,6 @@
     "entryFile": "public_api.ts"
   },
   "allowedNonPeerDependencies": [
-    "set-cookie-parser",
     "@capacitor/core",
     "@ionic/angular"
   ]

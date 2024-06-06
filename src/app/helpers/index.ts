@@ -1,3 +1,4 @@
+export * from './cookie-parse';
 export * from './cordova-supported';
 export * from './cordova';
 export * from './formdata-to-mutipart-array';
