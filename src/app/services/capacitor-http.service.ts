@@ -16,7 +16,7 @@ import { RequestOptions } from '../interfaces';
 })
 export class FsCapacitorHttp {
 
-  public sendRequest(request: HttpRequest<any>): any {
+  public sendRequest(request: HttpRequest<any>): Observable<HttpResponse<any>> {
     const dataType = request.body instanceof FormData ? 'formData' : null;
 
     return of(null)
@@ -214,17 +214,5 @@ export class FsCapacitorHttp {
     } else {
       console.log(...log);
     }
-  }
-
-  private _getSerializer(request: HttpRequest<any>) {
-    if (request.body instanceof FormData) {
-      return 'multipart';
-    }
-
-    if (typeof (request.body) === 'object') {
-      return 'json';
-    }
-
-    return 'utf8';
   }
 }

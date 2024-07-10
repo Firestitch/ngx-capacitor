@@ -10,13 +10,14 @@ import { FsMessageModule } from '@firestitch/message';
 import { FsStoreModule } from '@firestitch/store';
 
 
-import { FsApiModule } from '@firestitch/api';
+import { FS_API_REQUEST_INTERCEPTOR } from '@firestitch/api';
 import { FsCapacitorModule } from '@firestitch/capacitor';
 import { AppComponent } from './app.component';
 import {
   CordovaComponent,
   ExamplesComponent
 } from './components';
+import { TokenInterceptorFactory } from './interceptors';
 import { AppMaterialModule } from './material.module';
 
 
@@ -25,14 +26,13 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  bootstrap: [ AppComponent ],
+  bootstrap: [AppComponent],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
     AppMaterialModule,
     FormsModule,
     FsLabelModule,
-    FsApiModule.forRoot(),
     FsStoreModule.forRoot(),
     FsExampleModule.forRoot(),
     FsMessageModule.forRoot(),
@@ -53,7 +53,13 @@ const routes: Routes = [
     //   },
     //   deps: [NgZone],
     // },
+    { 
+      provide: FS_API_REQUEST_INTERCEPTOR, 
+      useFactory: TokenInterceptorFactory, 
+      multi: true, 
+    },
   ]
+  
 })
 export class PlaygroundModule {
 }
