@@ -1,4 +1,4 @@
-import { NgModule } from '@angular/core';
+import { APP_INITIALIZER, Injector, NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -11,7 +11,9 @@ import { FsStoreModule } from '@firestitch/store';
 
 
 import { FS_API_REQUEST_INTERCEPTOR } from '@firestitch/api';
-import { FsCapacitorModule } from '@firestitch/capacitor';
+import { FsCapacitorModule, FsCapacitorUpdate } from '@firestitch/capacitor';
+import { of } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import { AppComponent } from './app.component';
 import {
   CordovaComponent,
@@ -45,14 +47,21 @@ const routes: Routes = [
     CordovaComponent,
   ],
   providers: [
-    // {
-    //   provide: FS_FILE_CLICK_INTERCEPTOR,
-    //   multi: true,
-    //   useFactory: (ngZone: NgZone) => {
-    //     return new CordovaFileClickInterceptor(ngZone);
-    //   },
-    //   deps: [NgZone],
-    // },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: (
+        injector: Injector,
+      ) => {
+        return () => of(null)
+          .pipe(
+            tap(() => {
+              injector.get(FsCapacitorUpdate).listen();
+            }),
+          );
+      },
+      multi: true,
+      deps: [Injector],
+    },
     { 
       provide: FS_API_REQUEST_INTERCEPTOR, 
       useFactory: TokenInterceptorFactory, 
