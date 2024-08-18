@@ -15,7 +15,6 @@ class TokenInterceptor implements HttpInterceptor {
 
   public intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     console.log('begin');
-
     const headers = req.headers.append('X-api-key', '34095td98yvhs9w8dg6yd78yg0sd76gas98d67');
 
     return next.handle(req.clone({ headers }));

@@ -1,4 +1,4 @@
-import { APP_INITIALIZER, ModuleWithProviders, NgModule } from '@angular/core';
+import { APP_INITIALIZER, Injector, ModuleWithProviders, NgModule } from '@angular/core';
 
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,7 +10,7 @@ import { of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { UpdateComponent } from './components';
 import { FS_CAPACITOR_CONFIG } from './consts';
-import { CapacitorHttpInterceptor } from './interceptors';
+import { CapacitorHttpInterceptor, CapacitorUpdateInterceptor } from './interceptors';
 import { FsCapacitorConfig } from './interfaces';
 import { FsCapacitor, FsCapacitorApi, FsCapacitorHttp } from './services';
 
@@ -37,6 +37,12 @@ export class FsCapacitorModule {
           useClass: CapacitorHttpInterceptor,
           multi: true,
           deps: [FsCapacitor, FsCapacitorHttp],
+        },
+        {
+          provide: HTTP_INTERCEPTORS,
+          useClass: CapacitorUpdateInterceptor,
+          multi: true,
+          deps: [Injector],
         },
         { provide: FsApi, useClass: FsCapacitorApi },
         {    

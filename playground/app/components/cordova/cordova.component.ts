@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild } from '@angular/core';
+
 import { FsApi } from '@firestitch/api';
 import { formDataToMultipartObject } from '@firestitch/capacitor';
 
@@ -17,11 +18,11 @@ export class CordovaComponent {
   public config = {};
 
   constructor(
-    private _api: FsApi
+    private _api: FsApi,
   ) {}
 
   public download() {
-    this._api.download('test', 'post', 'https://specify.firestitch.dev');
+    this._api.download('test', 'post', 'https://specify.firestitch.dev/download');
   }
 
   public submit() {
@@ -31,9 +32,9 @@ export class CordovaComponent {
     console.log(x);
 
     formDataToMultipartObject(formData)
-    .subscribe((object) => {
-      console.log(object);
-    });
+      .subscribe((object) => {
+        console.log(object);
+      });
   }
 
 }
