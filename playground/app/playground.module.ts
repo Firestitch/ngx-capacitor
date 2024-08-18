@@ -55,7 +55,10 @@ const routes: Routes = [
         return () => of(null)
           .pipe(
             tap(() => {
-              injector.get(FsCapacitorUpdate).listen();
+              injector.get(FsCapacitorUpdate).listen({
+                updateUrl: 'http://[::1]:5300/api/app/update',
+                interval: 5,
+              });
             }),
           );
       },

@@ -1,7 +1,7 @@
 {
   "name": "@firestitch/capacitor",
   "title": "Cordova",
-  "version": "13.0.28",
+  "version": "13.0.29",
   "repository": {
     "type": "git",
     "url": "https://github.com/Firestitch/ngx-capacitor"
@@ -44,9 +44,11 @@
     "@capacitor/assets": "^2.0.4",
     "@capacitor/app": "^6.0.0",
     "@capacitor/core": "^6.0.0",
+    "@capacitor/device": "^6.0.0",
     "@capacitor/android": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
     "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/browser": "^6.0.0",
     "@capacitor/splash-screen": "^6.0.0",
     "@capawesome-team/capacitor-file-opener": "^6.0.0",
     "@firestitch/api": "^13.5.12",

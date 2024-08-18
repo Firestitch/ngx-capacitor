@@ -2,7 +2,8 @@
 
 export interface CapacitorUpdateAppData {
   version?: number,
-  identifier?: string,
+  bundleIdentifier?: string,
   name?: string,
-  build?: string,
+  buildNumber?: string,
+  platform?: string,
 }

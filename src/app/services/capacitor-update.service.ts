@@ -1,11 +1,14 @@
 import { Injectable } from '@angular/core';
-import { FsApi } from '@firestitch/api';
+import { DisplayApiError, FsApi } from '@firestitch/api';
 
-import { App, AppInfo } from '@capacitor/app';
-import { FsPrompt } from '@firestitch/prompt';
+import { App } from '@capacitor/app';
+import { Device } from '@capacitor/device';
 
-import { BehaviorSubject, from, Observable, of, timer } from 'rxjs';
-import { catchError, filter, finalize, switchMap, tap } from 'rxjs/operators';
+import { HttpContext } from '@angular/common/http';
+import { MatDialog } from '@angular/material/dialog';
+import { BehaviorSubject, from, Observable, of, throwError, timer } from 'rxjs';
+import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
+import { UpdateComponent } from '../components';
 import { CapacitorUpdateAppData, CapacitorUpdateConfig } from '../interfaces';
 
 
@@ -18,24 +21,53 @@ export class FsCapacitorUpdate {
   private _appData$ = new BehaviorSubject<CapacitorUpdateAppData>({});
 
   constructor(
-    private _prompt: FsPrompt,
     private _api: FsApi,
+    private _dialog: MatDialog,
   ) {}
 
   public listen(config?: CapacitorUpdateConfig) {
     const interval = (config?.interval || 60) * 1000;
     const delay = (config?.delay || 0) * 1000;
+    const updateUrl = (config?.updateUrl);
 
-    from(App.getInfo())
+    from(Device.getInfo())
     .pipe(
-      catchError(() => of(null)),
-      filter((data) => !!data),
-      tap((appInfo: AppInfo) => {
+      switchMap((deviceInfo) => {
+        return deviceInfo.platform === 'web' ?
+          throwError('Web platform detected: skipping app update') : of(deviceInfo);        
+      }), 
+      switchMap((deviceInfo) => from(App.getInfo())
+        .pipe(
+          map((appInfo) => ({
+            deviceInfo,
+            appInfo,
+          })
+          )
+        )
+      ),
+      // catchError(() => of({ 
+      //   appInfo: {
+      //     version: '',
+      //     id: 'com.firestitch.stg.tasteadvisor',
+      //     build: '100',
+      //     name: '',
+      //   },
+      //   deviceInfo: { platform: 'ios' }
+      // })),
+      catchError((e) => 
+        of(null)
+          .pipe(
+            tap(() => console.error(e)),
+            filter((data) => !!data)
+          )
+      ),
+      tap(({ appInfo, deviceInfo }) => {
         this.appData = {
           version: Number(appInfo.version),
-          identifier: appInfo.id,
-          build: appInfo.build,
+          bundleIdentifier: appInfo.id,
+          buildNumber: appInfo.build,
           name: appInfo.name,
+          platform: deviceInfo.platform,
         };
       }),
       switchMap(() => {
@@ -43,24 +75,30 @@ export class FsCapacitorUpdate {
         .pipe(
           filter(() => !this._pendingUpdate),
           switchMap(() =>
-            this._api.get(config.url, {
+            this._api.get(updateUrl, {
               version: this._appData$.getValue().version,
-              identifier: this._appData$.getValue().identifier,
+              buildNumber: this._appData$.getValue().buildNumber,
+              bundleIdentifier: this._appData$.getValue().bundleIdentifier,
+              platform: this._appData$.getValue().platform,
             }, 
-            { mapHttpResponseBodyData: false })
-              .pipe(
-                catchError(() => of(null)),
-              )
+            { 
+              mapHttpResponseBodyData: false, 
+              context: new HttpContext().set(DisplayApiError, false)  
+            })
+            .pipe(
+              catchError(() => 
+                of(null)
+                  .pipe(
+                    filter((data) => !!data)
+                  )
+              ),
+            )
           ),
-          filter((data) => !!data),
-          switchMap(({ minVersion, installUrl }) => {
-            return this._checkVersion(minVersion, installUrl);
-          }),
-          finalize(() => {
-            this._pendingUpdate = false;
+          switchMap(({ action, installUrl }) => {
+            return this._checkUpdate(action, installUrl);
           }),
         )
-      })
+      }),
     )
     .subscribe();
   }
@@ -77,26 +115,24 @@ export class FsCapacitorUpdate {
     return (this._appData$.getValue() || {}).version;
   }
 
-  private _checkVersion(minVersion: number, installUrl: string): Observable<any> {
+  private _checkUpdate(action: string, installUrl: string): Observable<any> {
     return of(null)
     .pipe(
       filter(() => {
-        return minVersion > this.appVersion;
+        return action === 'update';
       }),
       switchMap(() => {
         this._pendingUpdate = true;
 
-        return this._prompt
-          .confirm({
-            title: 'New Version Available',
-            template: `There a newer version of this app available`,
-            buttons: [
-              {
-                label: 'Update',
-                value: 'update',
-              }
-            ],
+        return this._dialog
+          .open(UpdateComponent, {
+            data: {
+              installUrl
+            },
+            disableClose: true,
           })
+          .afterClosed()
+
         })   
       );
   }
