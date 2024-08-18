@@ -44,7 +44,7 @@ export class FsCapacitorUpdate {
           })
           )
         )
-      ),
+      ),  
       // catchError(() => of({ 
       //   appInfo: {
       //     version: '',
