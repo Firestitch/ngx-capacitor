@@ -25,6 +25,7 @@ export class CapacitorUpdateInterceptor implements HttpInterceptor {
         const previewUrl = new URL(capacitorUpdate.previewApiUrl);
         const url = new URL(request.url);
         url.host = previewUrl.host;
+        url.port = previewUrl.port;
 
         request = request.clone({ url: url.toString() });
       } catch(e) {}
