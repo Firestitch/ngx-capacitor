@@ -1,23 +1,24 @@
 import { APP_INITIALIZER, Injector, NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule, Routes } from '@angular/router';
 
+import { FS_API_REQUEST_INTERCEPTOR } from '@firestitch/api';
+import { FsCapacitorModule, FsCapacitorUpdate } from '@firestitch/capacitor';
 import { FsExampleModule } from '@firestitch/example';
 import { FsLabelModule } from '@firestitch/label';
 import { FsMessageModule } from '@firestitch/message';
 import { FsStoreModule } from '@firestitch/store';
 
-
-import { FS_API_REQUEST_INTERCEPTOR } from '@firestitch/api';
-import { FsCapacitorModule, FsCapacitorUpdate } from '@firestitch/capacitor';
 import { of } from 'rxjs';
 import { tap } from 'rxjs/operators';
+
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+
 import { AppComponent } from './app.component';
 import {
   CordovaComponent,
-  ExamplesComponent
+  ExamplesComponent,
 } from './components';
 import { TokenInterceptorFactory } from './interceptors';
 import { AppMaterialModule } from './material.module';
@@ -65,13 +66,13 @@ const routes: Routes = [
       multi: true,
       deps: [Injector],
     },
-    { 
-      provide: FS_API_REQUEST_INTERCEPTOR, 
-      useFactory: TokenInterceptorFactory, 
-      multi: true, 
+    {
+      provide: FS_API_REQUEST_INTERCEPTOR,
+      useFactory: TokenInterceptorFactory,
+      multi: true,
     },
-  ]
-  
+  ],
+
 })
 export class PlaygroundModule {
 }

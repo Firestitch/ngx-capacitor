@@ -18,8 +18,8 @@ export class CapacitorHttpInterceptor implements HttpInterceptor {
   ) {}
 
   public intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    return this._capacitor.supported ? 
-      this._capacitorHttp.sendRequest(request) : 
+    return this._capacitor.supported ?
+      this._capacitorHttp.sendRequest(request) :
       next.handle(request);
   }
 }

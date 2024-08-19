@@ -1,13 +1,17 @@
 import { APP_INITIALIZER, Injector, ModuleWithProviders, NgModule } from '@angular/core';
 
-import { HTTP_INTERCEPTORS } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
-import { Capacitor } from '@capacitor/core';
+
 import { FsApi } from '@firestitch/api';
 import { FsDialogModule } from '@firestitch/dialog';
+
 import { of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
+
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
+import { Capacitor } from '@capacitor/core';
+
 import { UpdateComponent } from './components';
 import { FS_CAPACITOR_CONFIG } from './consts';
 import { CapacitorHttpInterceptor, CapacitorUpdateInterceptor } from './interceptors';
@@ -34,18 +38,18 @@ export class FsCapacitorModule {
         { provide: FS_CAPACITOR_CONFIG, useValue: config },
         {
           provide: HTTP_INTERCEPTORS,
-          useClass: CapacitorHttpInterceptor,
-          multi: true,
-          deps: [FsCapacitor, FsCapacitorHttp],
-        },
-        {
-          provide: HTTP_INTERCEPTORS,
           useClass: CapacitorUpdateInterceptor,
           multi: true,
           deps: [Injector],
         },
+        {
+          provide: HTTP_INTERCEPTORS,
+          useClass: CapacitorHttpInterceptor,
+          multi: true,
+          deps: [FsCapacitor, FsCapacitorHttp],
+        },
         { provide: FsApi, useClass: FsCapacitorApi },
-        {    
+        {
           provide: APP_INITIALIZER,
           useFactory: (
             capacitor: FsCapacitor,
@@ -53,14 +57,17 @@ export class FsCapacitorModule {
             return () => of(null)
               .pipe(
                 switchMap(() => {
-                  return Capacitor.getPlatform() === 'ios' ?
+                  return (
+                    Capacitor.getPlatform() === 'ios' ||
+                    Capacitor.getPlatform() === 'android'
+                  ) ?
                     capacitor.init() : of(null);
                 }),
               );
           },
           multi: true,
           deps: [FsCapacitor],
-        }, 
+        },
       ],
     };
   }
