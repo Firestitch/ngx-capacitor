@@ -6,6 +6,7 @@
   },
   "allowedNonPeerDependencies": [
     "@capacitor/core",
-    "@ionic/angular"
+    "@ionic/angular",
+    "set-cookie-parser"
   ]
 }

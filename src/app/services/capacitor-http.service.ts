@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
 
-import { CapacitorHttp, HttpOptions } from '@capacitor/core';
+import { guid } from '@firestitch/common';
+
 import { from, Observable, of, throwError } from 'rxjs';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
 import { HttpErrorResponse, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase } from '@angular/common/http';
+import { CapacitorHttp, HttpOptions } from '@capacitor/core';
 
-import { guid } from '@firestitch/common';
-import { catchError, map, switchMap, tap } from 'rxjs/operators';
+
 import { formDataToMultipartArray } from '../helpers';
 import { RequestOptions } from '../interfaces';
 
@@ -25,7 +27,7 @@ export class FsCapacitorHttp {
           if(request.body instanceof FormData) {
             const headers = request.headers.set('Content-Type', `multipart/form-data; boundary=-----------------------------${guid()}`);
             request = request.clone({ headers });
-             
+
           } else if(request.headers.get('Content-Type') === 'text/json') {
             const headers = request.headers.set('Content-Type', 'application/json');
             request = request.clone({ headers });
@@ -37,9 +39,9 @@ export class FsCapacitorHttp {
               .pipe(
                 tap((body) => {
                   request = request.clone({ body });
-                })
-              ) : 
-              of(null);
+                }),
+              ) :
+            of(null);
         }),
         switchMap(() => {
           const data = request.body || '';
@@ -75,33 +77,34 @@ export class FsCapacitorHttp {
             },
             dataType,
             responseType: request.responseType,
-          })
-        }) 
+          });
+        }),
       );
   }
 
   private _base64toBlob(b64Data, contentType) {
     const sliceSize = 512;
 
-    var byteCharacters = atob(b64Data);
-    var byteArrays = [];
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
 
-    for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-      var slice = byteCharacters.slice(offset, offset + sliceSize);
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
 
-      var byteNumbers = new Array(slice.length);
-      for (var i = 0; i < slice.length; i++) {
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
         byteNumbers[i] = slice.charCodeAt(i);
       }
-  
-      var byteArray = new Uint8Array(byteNumbers);
-  
+
+      const byteArray = new Uint8Array(byteNumbers);
+
       byteArrays.push(byteArray);
     }
-  
-    var blob = new Blob(byteArrays, { type: contentType });
+
+    const blob = new Blob(byteArrays, { type: contentType });
+
     return blob;
-  };
+  }
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
     const httpOptions: HttpOptions = {
@@ -112,7 +115,7 @@ export class FsCapacitorHttp {
       headers: options.headers,
       dataType: options.dataType,
       responseType: options.responseType,
-    }
+    };
 
     return from(CapacitorHttp.request(httpOptions))
       .pipe(
@@ -125,7 +128,7 @@ export class FsCapacitorHttp {
               body = JSON.parse(response.data);
             } catch (error) {
             }
-  
+
           } else if(options.responseType === 'blob') {
             body = this._base64toBlob(body, contentType);
           }
@@ -191,7 +194,7 @@ export class FsCapacitorHttp {
       });
 
     const status: number = httpResponse?.status || 0;
-    const log = [options.method.toUpperCase() + ' ' + status, _url.toString(), options.data || ''];
+    const log = [`${options.method.toUpperCase()  } ${  status}`, _url.toString(), options.data || ''];
 
     if (httpResponse) {
       log.push(...[

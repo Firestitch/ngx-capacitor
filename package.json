@@ -1,7 +1,7 @@
 {
   "name": "@firestitch/capacitor",
   "title": "Cordova",
-  "version": "13.0.33",
+  "version": "13.0.35",
   "repository": {
     "type": "git",
     "url": "https://github.com/Firestitch/ngx-capacitor"
@@ -83,13 +83,15 @@
     "lodash-es": "^4.17.15",
     "rxjs": "^6.5.3",
     "typescript": "4.6.4",
-    "zone.js": "~0.11.4"
+    "zone.js": "~0.11.4",
+    "@types/set-cookie-parser": "^2.4.10"
   },
   "engines": {
     "node": ">=10.0.0"
   },
   "dependencies": {
     "@capacitor/core": "^6.0.0",
-    "@ionic/angular": "^6.7.3"
+    "@ionic/angular": "^6.7.3",
+    "set-cookie-parser": "^2.7.0"
   }
 }

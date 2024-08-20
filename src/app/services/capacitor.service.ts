@@ -3,12 +3,12 @@ import { Injectable } from '@angular/core';
 import { from, Observable, of, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+import { Capacitor } from '@capacitor/core';
 import { Platform } from '@ionic/angular';
 
 import { CordovaState } from '../enums';
 import { getCordova } from '../helpers';
 
-import { Capacitor } from '@capacitor/core';
 import { FsCapacitorCookie } from './capacitor-cookie.service';
 
 const NativeFile = window.File;
@@ -22,8 +22,6 @@ export class FsCapacitor {
 
   public CordovaFile;
   public CordovaFileReader;
-  
-  private _ready = false;
 
   constructor(
     private _platform: Platform,
@@ -79,10 +77,11 @@ export class FsCapacitor {
       if(this.cordova) {
         observer.next(this.cordova);
         observer.complete();
+
         return;
       }
 
-      this.window.addEventListener('cordovaLoaded', () => {  
+      this.window.addEventListener('cordovaLoaded', () => {
         observer.next(this.cordova);
         observer.complete();
       });
