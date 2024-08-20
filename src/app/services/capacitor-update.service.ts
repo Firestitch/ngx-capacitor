@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 
 import { MatDialog } from '@angular/material/dialog';
 
-import { DisplayApiError, FsApi } from '@firestitch/api';
+import { FsApi, ProcessApiError } from '@firestitch/api';
 
 import { BehaviorSubject, from, Observable, of, throwError, timer } from 'rxjs';
 import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
@@ -89,7 +89,7 @@ export class FsCapacitorUpdate {
                 {
                   mapHttpResponseBodyData: false,
                   context: new HttpContext()
-                    .set(DisplayApiError, false)
+                    .set(ProcessApiError, false)
                     .set(CapacitorUpdateToken, true),
                 })
                   .pipe(
