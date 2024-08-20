@@ -68,6 +68,10 @@ export class FsCapacitorCookie {
      */
     sameSite?: string | undefined;
   }[] {
+    if(!cookieStr) {
+      return [];
+    }
+
     const cookies = cookieStr.split(/, (?=[^\s]+=)/s);
 
     return cookies
