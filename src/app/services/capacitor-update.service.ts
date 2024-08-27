@@ -50,15 +50,6 @@ export class FsCapacitorUpdate {
             ),
           ),
         ),
-        catchError(() => of({
-          appInfo: {
-            version: '',
-            id: 'com.firestitch.stg.tasteadvisor',
-            build: '200',
-            name: '',
-          },
-          deviceInfo: { platform: 'ios' },
-        })),
         catchError((e) =>
           of(null)
             .pipe(
