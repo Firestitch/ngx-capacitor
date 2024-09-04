@@ -25,7 +25,15 @@ import { AppMaterialModule } from './material.module';
 
 
 const routes: Routes = [
-  { path: '', component: ExamplesComponent },
+  { path: '',
+    data: { fsCapacitorStatusBar: { visible: false, backgroundColor: '#fff' } },
+    children: [
+      {
+        path: '', component: ExamplesComponent,
+        data: { fsCapacitorStatusBar: { visible: true } },
+      },
+    ],
+  },
 ];
 
 @NgModule({

@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild } from '@angular/core';
 
 import { FsApi } from '@firestitch/api';
-import { formDataToMultipartObject } from '@firestitch/capacitor';
 
 
 @Component({
@@ -37,13 +36,13 @@ export class CordovaComponent {
   public submit() {
     const formData: FormData = new FormData(this.form.nativeElement);
 
-    const x = Object.fromEntries(formData);
-    console.log(x);
+    // const x = Object.fromEntries(formData);
+    // console.log(x);
 
-    formDataToMultipartObject(formData)
-      .subscribe((object) => {
-        console.log(object);
-      });
+    // formDataToMultipartObject(formData)
+    //   .subscribe((object) => {
+    //     console.log(object);
+    //   });
   }
 
 }

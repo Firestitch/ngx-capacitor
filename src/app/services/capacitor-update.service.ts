@@ -5,11 +5,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { FsApi, ProcessApiError } from '@firestitch/api';
 
 import { BehaviorSubject, from, Observable, of, throwError, timer } from 'rxjs';
-import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
+import { catchError, filter, switchMap, tap } from 'rxjs/operators';
 
 import { HttpContext } from '@angular/common/http';
 import { App } from '@capacitor/app';
-import { Device } from '@capacitor/device';
+import { Capacitor } from '@capacitor/core';
 
 import { UpdateComponent } from '../components';
 import { CapacitorUpdateToken } from '../consts';
@@ -30,40 +30,34 @@ export class FsCapacitorUpdate {
     private _dialog: MatDialog,
   ) {}
 
-  public listen(config?: CapacitorUpdateConfig) {
+  public listen(config?: CapacitorUpdateConfig): void {
     const interval = (config?.interval || 60) * 1000;
     const delay = (config?.delay || 0) * 1000;
     const updateUrl = (config?.updateUrl);
 
-    from(Device.getInfo())
+    if (
+      Capacitor.getPlatform() !== 'ios' &&
+      Capacitor.getPlatform() !== 'android'
+    ) {
+      console.log(`Skipping update service platform ${Capacitor.getPlatform()} not supported`);
+
+      return;
+    }
+
+    from(App.getInfo())
       .pipe(
-        switchMap((deviceInfo) => {
-          return deviceInfo.platform === 'web' ?
-            throwError('Web platform detected: skipping app update') : of(deviceInfo);
+        catchError((e) => {
+          console.error(e);
+
+          return throwError(e);
         }),
-        switchMap((deviceInfo) => from(App.getInfo())
-          .pipe(
-            map((appInfo) => ({
-              deviceInfo,
-              appInfo,
-            }),
-            ),
-          ),
-        ),
-        catchError((e) =>
-          of(null)
-            .pipe(
-              tap(() => console.error(e)),
-              filter((data) => !!data),
-            ),
-        ),
-        tap(({ appInfo, deviceInfo }) => {
+        tap((appInfo) => {
           this.appData = {
             version: Number(appInfo.version),
             bundleIdentifier: appInfo.id,
             buildNumber: appInfo.build,
             name: appInfo.name,
-            platform: deviceInfo.platform,
+            platform: Capacitor.getPlatform(),
           };
         }),
         switchMap(() => {

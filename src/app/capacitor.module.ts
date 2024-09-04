@@ -10,7 +10,6 @@ import { of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
-import { Capacitor } from '@capacitor/core';
 
 import { UpdateComponent } from './components';
 import { FS_CAPACITOR_CONFIG } from './consts';
@@ -56,13 +55,7 @@ export class FsCapacitorModule {
           ) => {
             return () => of(null)
               .pipe(
-                switchMap(() => {
-                  return (
-                    Capacitor.getPlatform() === 'ios' ||
-                    Capacitor.getPlatform() === 'android'
-                  ) ?
-                    capacitor.init() : of(null);
-                }),
+                switchMap(() => capacitor.init()),
               );
           },
           multi: true,

@@ -1,18 +1,21 @@
 import { Injectable } from '@angular/core';
+import { ActivationEnd, Router } from '@angular/router';
 
 import { from, Observable, of, throwError } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, switchMap, tap } from 'rxjs/operators';
 
 import { Capacitor } from '@capacitor/core';
+import { StatusBar } from '@capacitor/status-bar';
 import { Platform } from '@ionic/angular';
 
 import { CordovaState } from '../enums';
 import { getCordova } from '../helpers';
+import { CapacitorStatusBarConfig } from '../interfaces';
 
 import { FsCapacitorCookie } from './capacitor-cookie.service';
 
-const NativeFile = window.File;
-const NativeFileReader = window.FileReader;
+const nativeFile = window.File;
+const nativeFileReader = window.FileReader;
 
 
 @Injectable({
@@ -26,6 +29,7 @@ export class FsCapacitor {
   constructor(
     private _platform: Platform,
     private _capacitorCookie: FsCapacitorCookie,
+    private _router: Router,
   ) {}
 
   public get ready$(): Observable<any> {
@@ -102,14 +106,65 @@ export class FsCapacitor {
   }
 
   public init(): Observable<void> {
+    if (
+      Capacitor.getPlatform() !== 'ios' &&
+      Capacitor.getPlatform() !== 'android'
+    ) {
+      console.log(`Skipping capacitor service init() platform ${Capacitor.getPlatform()} not supported`);
+
+      return of(null);
+    }
+
     return this.ready$
       .pipe(
         tap(() => {
-          console.log('Cordova Service init() ready');
+          console.log('Capacitor service init() ready');
         }),
         tap(() => this._initFile()),
+        tap(() => this._initStatusBar()),
         tap(() => this._capacitorCookie.init()),
       );
+  }
+
+  private _initStatusBar(): void {
+    this._router.events
+      .pipe(
+        filter((event) => event instanceof ActivationEnd),
+        distinctUntilChanged(),
+        switchMap((event: ActivationEnd) => from(StatusBar.getInfo())
+          .pipe(
+            map((info) => ({ event, info })),
+          )),
+      )
+      .subscribe(({ event, info }) => {
+        let fsCapacitorStatusBar: CapacitorStatusBarConfig = {
+          visible: info.visible,
+        };
+
+        let activatedRoute = event.snapshot;
+        do {
+          fsCapacitorStatusBar = {
+            ...activatedRoute.data?.fsCapacitorStatusBar || {},
+            ...fsCapacitorStatusBar,
+          };
+
+          activatedRoute = activatedRoute.parent;
+        } while(activatedRoute);
+
+        if(fsCapacitorStatusBar.visible) {
+          StatusBar.show();
+        } else {
+          StatusBar.hide();
+        }
+
+        if(fsCapacitorStatusBar.backgroundColor) {
+          StatusBar.setBackgroundColor({ color: fsCapacitorStatusBar.backgroundColor });
+        }
+
+        if(fsCapacitorStatusBar.style) {
+          StatusBar.setStyle({ style: fsCapacitorStatusBar.style });
+        }
+      });
   }
 
   /**
@@ -118,8 +173,8 @@ export class FsCapacitor {
   private _initFile(): void {
     this.CordovaFile = this.window.File;
     this.CordovaFileReader = this.window.FileReader;
-    this.window.File = NativeFile;
-    this.window.FileReader = NativeFileReader;
+    this.window.File = nativeFile;
+    this.window.FileReader = nativeFileReader;
     this.window.CordovaFile = this.CordovaFile;
     this.window.CordovaFileReader = this.CordovaFileReader;
   }

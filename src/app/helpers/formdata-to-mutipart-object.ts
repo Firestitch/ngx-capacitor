@@ -1,4 +1,4 @@
-import { forkJoin, Observable, of } from "rxjs";
+import { forkJoin, Observable, of } from 'rxjs';
 
 
 export function formDataToMultipartObject<TModel>(formData: FormData): Observable<any> {
@@ -10,11 +10,11 @@ export function formDataToMultipartObject<TModel>(formData: FormData): Observabl
           [name]: (
             formData.get(name) instanceof Blob ?
               _readFileAsBase64(formData.get(name) as Blob)
-            : of(formData.get(name))
-            )
+              : of(formData.get(name))
+          ),
         };
-      }, {})
-    );
+      }, {}),
+  );
 }
 
 function _readFileAsBase64(file: Blob): Observable<string> {
@@ -25,9 +25,9 @@ function _readFileAsBase64(file: Blob): Observable<string> {
       observer.next(reader.result as string);
       observer.complete();
     };
-    
+
     reader.onerror = function (error) {
       observer.error(error);
     };
   });
-}  
+}

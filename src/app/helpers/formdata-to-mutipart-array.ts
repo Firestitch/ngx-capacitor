@@ -1,5 +1,5 @@
-import { forkJoin, Observable, of } from "rxjs";
-import { map } from "rxjs/operators";
+import { forkJoin, Observable, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 
 export function formDataToMultipartArray<TModel>(formData: FormData): Observable<any> {
@@ -8,25 +8,25 @@ export function formDataToMultipartArray<TModel>(formData: FormData): Observable
     Object.keys(Object.fromEntries(formData))
       .map((name) => {
         const value = formData.get(name);
-      
+
         return value instanceof Blob ?
           _readFileAsBase64(value)
             .pipe(
-                map((data) => ({
-                  key: name,
-                  fileName: value.name,
-                  contentType: value.type,
-                  type: 'base64File',
-                  value: data,
-                })),
-              )
-        : of({
+              map((data) => ({
+                key: name,
+                fileName: value.name,
+                contentType: value.type,
+                type: 'base64File',
+                value: data,
+              })),
+            )
+          : of({
             key: name,
             type: 'string',
             value,
           });
-      })
-    );
+      }),
+  );
 }
 
 function _readFileAsBase64(file: Blob): Observable<string> {
@@ -37,9 +37,9 @@ function _readFileAsBase64(file: Blob): Observable<string> {
       observer.next((reader.result as string).substr((reader.result as string).indexOf(',') + 1));
       observer.complete();
     };
-    
+
     reader.onerror = function (error) {
       observer.error(error);
     };
   });
-}  
+}
