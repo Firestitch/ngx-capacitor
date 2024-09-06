@@ -36,10 +36,10 @@ export class FsCapacitorUpdate {
     const updateUrl = (config?.updateUrl);
 
     if (
-      Capacitor.getPlatform() !== 'ios' &&
-      Capacitor.getPlatform() !== 'android'
+      this.platform !== 'ios' &&
+      this.platform !== 'android'
     ) {
-      console.log(`Skipping update service platform ${Capacitor.getPlatform()} not supported`);
+      console.log(`Skipping update service platform ${this.platform} not supported`);
 
       return;
     }
@@ -57,7 +57,7 @@ export class FsCapacitorUpdate {
             bundleIdentifier: appInfo.id,
             buildNumber: appInfo.build,
             name: appInfo.name,
-            platform: Capacitor.getPlatform(),
+            platform: this.platform,
           };
         }),
         switchMap(() => {
@@ -103,8 +103,20 @@ export class FsCapacitorUpdate {
     this._appData$.next(appData);
   }
 
-  public get appVersion() {
+  public get version() {
     return (this._appData$.getValue() || {}).version;
+  }
+
+  public get buildNumber() {
+    return (this._appData$.getValue() || {}).buildNumber;
+  }
+
+  public get bundleIdentifier() {
+    return (this._appData$.getValue() || {}).bundleIdentifier;
+  }
+
+  public get platform(): 'android' | 'ios' | 'web' {
+    return Capacitor.getPlatform() as any;
   }
 
   public get previewApiUrl() {

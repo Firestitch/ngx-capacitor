@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { ActivationEnd, Router } from '@angular/router';
 
 import { from, Observable, of, throwError } from 'rxjs';
-import { distinctUntilChanged, filter, map, switchMap, tap } from 'rxjs/operators';
+import { filter, map, switchMap, tap } from 'rxjs/operators';
 
 import { Capacitor } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
@@ -121,7 +121,7 @@ export class FsCapacitor {
           console.log('Capacitor service init() ready');
         }),
         tap(() => this._initFile()),
-        tap(() => this._initStatusBar()),
+        //tap(() => this._initStatusBar()),
         tap(() => this._capacitorCookie.init()),
       );
   }
@@ -130,7 +130,6 @@ export class FsCapacitor {
     this._router.events
       .pipe(
         filter((event) => event instanceof ActivationEnd),
-        distinctUntilChanged(),
         switchMap((event: ActivationEnd) => from(StatusBar.getInfo())
           .pipe(
             map((info) => ({ event, info })),
