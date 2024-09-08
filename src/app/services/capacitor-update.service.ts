@@ -53,9 +53,9 @@ export class FsCapacitorUpdate {
         }),
         tap((appInfo) => {
           this.appData = {
-            version: Number(appInfo.version),
+            version: appInfo.version,
             bundleIdentifier: appInfo.id,
-            buildNumber: appInfo.build,
+            buildNumber: Number(appInfo.build),
             name: appInfo.name,
             platform: this.platform,
           };

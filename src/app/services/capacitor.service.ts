@@ -9,7 +9,6 @@ import { StatusBar } from '@capacitor/status-bar';
 import { Platform } from '@ionic/angular';
 
 import { CordovaState } from '../enums';
-import { getCordova } from '../helpers';
 import { CapacitorStatusBarConfig } from '../interfaces';
 
 import { FsCapacitorCookie } from './capacitor-cookie.service';
@@ -95,14 +94,6 @@ export class FsCapacitor {
           this.state = CordovaState.Ready;
         }),
       );
-  }
-
-  public getAppVersion(): Observable<string> {
-    if(!getCordova()?.getAppVersion) {
-      return of(null);
-    }
-
-    return from<string>(getCordova().getAppVersion.getVersionNumber());
   }
 
   public init(): Observable<void> {
