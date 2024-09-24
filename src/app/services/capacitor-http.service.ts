@@ -2,10 +2,13 @@ import { Injectable } from '@angular/core';
 
 import { guid } from '@firestitch/common';
 
-import { from, Observable, of, throwError } from 'rxjs';
+import { concat, from, Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
-import { HttpErrorResponse, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase } from '@angular/common/http';
+import {
+  HttpErrorResponse, HttpEventType, HttpHeaders,
+  HttpRequest, HttpResponse, HttpResponseBase, HttpSentEvent,
+} from '@angular/common/http';
 import { CapacitorHttp, HttpOptions } from '@capacitor/core';
 
 
@@ -18,14 +21,15 @@ import { RequestOptions } from '../interfaces';
 })
 export class FsCapacitorHttp {
 
-  public sendRequest(request: HttpRequest<any>): Observable<HttpResponse<any>> {
+  public sendRequest(request: HttpRequest<any>): Observable<HttpResponse<any>|HttpSentEvent> {
     const dataType = request.body instanceof FormData ? 'formData' : null;
 
     return of(null)
       .pipe(
         tap(() => {
           if(request.body instanceof FormData) {
-            const headers = request.headers.set('Content-Type', `multipart/form-data; boundary=-----------------------------${guid()}`);
+            const headers = request.headers
+              .set('Content-Type', `multipart/form-data; boundary=-----------------------------${guid()}`);
             request = request.clone({ headers });
 
           } else if(request.headers.get('Content-Type') === 'text/json') {
@@ -67,17 +71,20 @@ export class FsCapacitorHttp {
               };
             }, {});
 
-          return this._sendRequest(request.url, {
-            method: request.method.toUpperCase(),
-            data,
-            params,
-            headers: {
-              ...headers,
-              ['Cookie']: document.cookie,
-            },
-            dataType,
-            responseType: request.responseType,
-          });
+          return concat(
+            of({ type:  HttpEventType.Sent } as HttpSentEvent),
+            this._sendRequest(request.url, {
+              method: request.method.toUpperCase(),
+              data,
+              params,
+              headers: {
+                ...headers,
+                ['Cookie']: document.cookie,
+              },
+              dataType,
+              responseType: request.responseType,
+            }),
+          );
         }),
       );
   }
