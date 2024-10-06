@@ -6,7 +6,6 @@ import { filter, map, switchMap, tap } from 'rxjs/operators';
 
 import { Capacitor } from '@capacitor/core';
 import { StatusBar } from '@capacitor/status-bar';
-import { Platform } from '@ionic/angular';
 
 import { CordovaState } from '../enums';
 import { CapacitorStatusBarConfig } from '../interfaces';
@@ -26,7 +25,6 @@ export class FsCapacitor {
   public CordovaFileReader;
 
   constructor(
-    private _platform: Platform,
     private _capacitorCookie: FsCapacitorCookie,
     private _router: Router,
   ) {}
@@ -34,11 +32,7 @@ export class FsCapacitor {
   public get ready$(): Observable<any> {
     return of(true);
   }
-
-  public get resume$(): Observable<void> {
-    return this._platform.resume;
-  }
-
+  
   public get window(): any {
     return window as any;
   }
@@ -112,7 +106,6 @@ export class FsCapacitor {
           console.log('Capacitor service init() ready');
         }),
         tap(() => this._initFile()),
-        //tap(() => this._initStatusBar()),
         tap(() => this._capacitorCookie.init()),
       );
   }
