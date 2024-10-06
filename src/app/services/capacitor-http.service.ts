@@ -5,10 +5,7 @@ import { guid } from '@firestitch/common';
 import { concat, from, Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
-import {
-  HttpErrorResponse, HttpEventType, HttpHeaders,
-  HttpRequest, HttpResponse, HttpResponseBase, HttpSentEvent,
-} from '@angular/common/http';
+import { HttpErrorResponse, HttpEventType, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase, HttpSentEvent } from '@angular/common/http';
 import { CapacitorHttp, HttpOptions } from '@capacitor/core';
 
 

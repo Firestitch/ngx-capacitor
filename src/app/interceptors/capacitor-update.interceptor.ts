@@ -3,9 +3,7 @@ import { Injectable, Injector } from '@angular/core';
 import { Observable } from 'rxjs';
 
 
-import {
-  HttpEvent, HttpHandler, HttpInterceptor, HttpRequest,
-} from '@angular/common/http';
+import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
 
 import { CapacitorUpdateToken } from '../consts';
 import { FsCapacitorUpdate } from '../services';
