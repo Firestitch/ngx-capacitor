@@ -130,7 +130,7 @@ export class FsCapacitorHttp {
       headers: options.headers,
       dataType: options.dataType,
       responseType: options.responseType,
-      shouldEncodeUrlParams: false,
+      shouldEncodeUrlParams: true,
     };
 
     return from(CapacitorHttp.request(httpOptions))

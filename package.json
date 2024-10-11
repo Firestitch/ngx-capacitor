@@ -1,7 +1,7 @@
 {
   "name": "@firestitch/capacitor",
   "title": "Cordova",
-  "version": "14.0.1",
+  "version": "14.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/Firestitch/ngx-capacitor"
