@@ -5,7 +5,10 @@ import { guid } from '@firestitch/common';
 import { concat, from, Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
-import { HttpErrorResponse, HttpEventType, HttpHeaders, HttpRequest, HttpResponse, HttpResponseBase, HttpSentEvent } from '@angular/common/http';
+import {
+  HttpErrorResponse, HttpEventType, HttpHeaders,
+  HttpRequest, HttpResponse, HttpResponseBase, HttpSentEvent,
+} from '@angular/common/http';
 import { CapacitorHttp, HttpOptions } from '@capacitor/core';
 
 
@@ -111,14 +114,21 @@ export class FsCapacitorHttp {
   }
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
+    const _url = new URL(url);
+
+    Object.keys(options.params)
+      .forEach((name) => {
+        _url.searchParams.set(name, options.params[name]);
+      });
+
     const httpOptions: HttpOptions = {
+      url: _url.toString(),
       method: options.method,
-      url,
       data: options.data,
-      params: options.params,
       headers: options.headers,
       dataType: options.dataType,
       responseType: options.responseType,
+      shouldEncodeUrlParams: true,
     };
 
     return from(CapacitorHttp.request(httpOptions))
@@ -131,6 +141,7 @@ export class FsCapacitorHttp {
             try {
               body = JSON.parse(response.data);
             } catch (error) {
+              //
             }
 
           } else if(options.responseType === 'blob') {
@@ -153,7 +164,7 @@ export class FsCapacitorHttp {
           if (error.status <= 0) {
             const errorResponse = new HttpErrorResponse({
               ...error,
-              url,
+              url: _url.toString(),
             });
 
             this._log(options, '', errorResponse);
@@ -161,7 +172,9 @@ export class FsCapacitorHttp {
             let body = error.error;
             try {
               body = JSON.parse(error.error);
-            } catch (e) { }
+            } catch (e) {
+              //
+            }
 
             const httpResponse = new HttpResponse({
               body,
@@ -198,7 +211,18 @@ export class FsCapacitorHttp {
       });
 
     const status: number = httpResponse?.status || 0;
-    const log = [`${options.method.toUpperCase()  } ${  status}`, _url.toString(), options.data || ''];
+    const log = [
+      `${options.method.toUpperCase()} ${status}`, 
+      _url.toString(), 
+      Array.from(_url.searchParams.keys())
+        .reduce((accum, name: string) => {
+          return {
+            ...accum,
+            [name]: _url.searchParams.get(name),
+          };
+        }, {}),
+      options.data || '',
+    ];
 
     if (httpResponse) {
       log.push(...[
