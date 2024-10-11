@@ -114,17 +114,15 @@ export class FsCapacitorHttp {
   }
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
-    const params =  Object.keys(options.params || {})
-      .reduce((accum, name) => {
-        return {
-          ...accum,
-          [name]: encodeURIComponent(options.params[name] || ''),
-        };
-      }, {});
+    const _url = new URL(url);
+
+    Object.keys(options.params)
+      .forEach((name) => {
+        _url.searchParams.set(name, options.params[name]);
+      });
 
     const httpOptions: HttpOptions = {
-      url,
-      params,
+      url: _url.toString(),
       method: options.method,
       data: options.data,
       headers: options.headers,
@@ -166,7 +164,7 @@ export class FsCapacitorHttp {
           if (error.status <= 0) {
             const errorResponse = new HttpErrorResponse({
               ...error,
-              url,
+              url: _url.toString(),
             });
 
             this._log(options, '', errorResponse);
