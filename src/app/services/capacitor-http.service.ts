@@ -114,14 +114,23 @@ export class FsCapacitorHttp {
   }
 
   private _sendRequest(url: string, options: RequestOptions): Observable<HttpResponse<any>> {
+    const params =  Object.keys(options.params || {})
+      .reduce((accum, name) => {
+        return {
+          ...accum,
+          [name]: encodeURIComponent(options.params[name] || ''),
+        };
+      }, {});
+
     const httpOptions: HttpOptions = {
-      method: options.method,
       url,
+      params,
+      method: options.method,
       data: options.data,
-      params: options.params,
       headers: options.headers,
       dataType: options.dataType,
       responseType: options.responseType,
+      shouldEncodeUrlParams: false,
     };
 
     return from(CapacitorHttp.request(httpOptions))
@@ -134,6 +143,7 @@ export class FsCapacitorHttp {
             try {
               body = JSON.parse(response.data);
             } catch (error) {
+              //
             }
 
           } else if(options.responseType === 'blob') {
@@ -164,7 +174,9 @@ export class FsCapacitorHttp {
             let body = error.error;
             try {
               body = JSON.parse(error.error);
-            } catch (e) { }
+            } catch (e) {
+              //
+            }
 
             const httpResponse = new HttpResponse({
               body,
@@ -201,7 +213,18 @@ export class FsCapacitorHttp {
       });
 
     const status: number = httpResponse?.status || 0;
-    const log = [`${options.method.toUpperCase()  } ${  status}`, _url.toString(), options.data || ''];
+    const log = [
+      `${options.method.toUpperCase()} ${status}`, 
+      _url.toString(), 
+      Array.from(_url.searchParams.keys())
+        .reduce((accum, name: string) => {
+          return {
+            ...accum,
+            [name]: _url.searchParams.get(name),
+          };
+        }, {}),
+      options.data || '',
+    ];
 
     if (httpResponse) {
       log.push(...[
