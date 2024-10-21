@@ -4,8 +4,9 @@
   "lib": {
     "entryFile": "public_api.ts"
   },
-  "allowedNonPeerDependencies": [
-    "@capacitor/core",
+  "allowedNonPeerDependencies": [    
+    "@capawesome-team/capacitor-file-opener",
+    "@capacitor/browser",
     "@capacitor/core",
     "@capacitor/app",
     "@capacitor/device",
