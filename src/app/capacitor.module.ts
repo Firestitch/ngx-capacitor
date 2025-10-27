@@ -19,15 +19,12 @@ import { FsCapacitor, FsCapacitorApi, FsCapacitorHttp } from './services';
 
 
 @NgModule({
-  imports: [
-    MatButtonModule,
-    MatDialogModule,
-
-    FsDialogModule,
-  ],
-  declarations: [
-    UpdateComponent,
-  ],
+    imports: [
+        MatButtonModule,
+        MatDialogModule,
+        FsDialogModule,
+        UpdateComponent,
+    ],
 })
 export class FsCapacitorModule {
   public static forRoot(config: FsCapacitorConfig = {}): ModuleWithProviders<FsCapacitorModule> {

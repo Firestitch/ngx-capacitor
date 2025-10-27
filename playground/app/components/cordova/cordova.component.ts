@@ -1,13 +1,16 @@
 import { ChangeDetectionStrategy, Component, ElementRef, ViewChild } from '@angular/core';
 
 import { FsApi } from '@firestitch/api';
+import { FormsModule } from '@angular/forms';
 
 
 @Component({
-  selector: 'app-cordova',
-  templateUrl: './cordova.component.html',
-  styleUrls: ['./cordova.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: 'app-cordova',
+    templateUrl: './cordova.component.html',
+    styleUrls: ['./cordova.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: true,
+    imports: [FormsModule],
 })
 export class CordovaComponent {
 
