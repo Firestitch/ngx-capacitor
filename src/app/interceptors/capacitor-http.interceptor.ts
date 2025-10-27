@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { Observable } from 'rxjs';
 
@@ -10,10 +10,9 @@ import { FsCapacitor, FsCapacitorHttp } from '../services';
 
 @Injectable()
 export class CapacitorHttpInterceptor implements HttpInterceptor {
-  constructor(
-    private _capacitor: FsCapacitor,
-    private _capacitorHttp: FsCapacitorHttp,
-  ) {}
+  private _capacitor = inject(FsCapacitor);
+  private _capacitorHttp = inject(FsCapacitorHttp);
+
 
   public intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return this._capacitor.supported ?

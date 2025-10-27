@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { parse } from '@firestitch/date';
 import { FsStore } from '@firestitch/store';
@@ -11,12 +11,10 @@ import * as cookieParser from 'set-cookie-parser';
   providedIn: 'root',
 })
 export class FsCapacitorCookie {
+  private _store = inject(FsStore);
+
 
   private _cookies = [];
-
-  constructor(
-    private _store: FsStore,
-  ) {}
 
   public init(): void {
     this._cookies = (this._store.get('cookie') || [])

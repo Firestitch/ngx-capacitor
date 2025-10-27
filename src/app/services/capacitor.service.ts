@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ActivationEnd, Router } from '@angular/router';
 
 import { from, Observable, of, throwError } from 'rxjs';
@@ -20,14 +20,12 @@ const nativeFileReader = window.FileReader;
   providedIn: 'root',
 })
 export class FsCapacitor {
+  private _capacitorCookie = inject(FsCapacitorCookie);
+  private _router = inject(Router);
+
 
   public CordovaFile;
   public CordovaFileReader;
-
-  constructor(
-    private _capacitorCookie: FsCapacitorCookie,
-    private _router: Router,
-  ) {}
 
   public get ready$(): Observable<any> {
     return of(true);

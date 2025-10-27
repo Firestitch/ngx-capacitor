@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { MatDialog } from '@angular/material/dialog';
 
@@ -20,15 +20,13 @@ import { CapacitorUpdateAppData, CapacitorUpdateConfig } from '../interfaces';
   providedIn: 'root',
 })
 export class FsCapacitorUpdate {
+  private _api = inject(FsApi);
+  private _dialog = inject(MatDialog);
+
 
   private _pendingUpdate = false;
   private _previewApiUrl: string;
   private _appData$ = new BehaviorSubject<CapacitorUpdateAppData>({});
-
-  constructor(
-    private _api: FsApi,
-    private _dialog: MatDialog,
-  ) {}
 
   public listen(config?: CapacitorUpdateConfig): void {
     const interval = (config?.interval || 60) * 1000;

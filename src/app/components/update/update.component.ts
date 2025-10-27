@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { MAT_DIALOG_DATA, MatDialogTitle, MatDialogContent, MatDialogActions } from '@angular/material/dialog';
 
@@ -23,12 +23,8 @@ import { MatButton } from '@angular/material/button';
     ],
 })
 export class UpdateComponent {
+  private _data = inject(MAT_DIALOG_DATA);
 
-  constructor(
-    @Inject(MAT_DIALOG_DATA) private _data: {
-      installUrl: string;
-    },
-  ) { }
 
   public update(): void {
     Browser.open({ url: this._data.installUrl });
