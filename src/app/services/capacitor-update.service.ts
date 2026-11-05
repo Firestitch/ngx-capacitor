@@ -3,7 +3,7 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 import { CapacitorUpdateConfig } from '@firestitch/capacitor/config';
 
 import { EMPTY, Observable, ReplaySubject, Subject, forkJoin, from, merge, of, race, timer } from 'rxjs';
-import { catchError, exhaustMap, filter, finalize, map, share, switchMap, take, tap } from 'rxjs/operators';
+import { catchError, defaultIfEmpty, exhaustMap, filter, finalize, map, share, switchMap, take, tap } from 'rxjs/operators';
 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { App } from '@capacitor/app';
@@ -38,6 +38,8 @@ const BUILTIN_KEY = 'fs-capacitor-update-builtin';
 const FAILED_KEY = 'fs-capacitor-update-failed';
 const CHECK_KEY = 'fs-capacitor-update-check';
 const EVENTS_KEY = 'fs-capacitor-update-events';
+// The downloaded version waiting to go in, so the next launch installs it without the network
+const WAITING_KEY = 'fs-capacitor-update-waiting';
 // The history keeps this many of the newest events
 const EVENT_LIMIT = 20;
 const MANIFEST_TIMEOUT = 10000;
@@ -51,7 +53,9 @@ const MANIFEST_TIMEOUT = 10000;
  * - A new version downloads in the background and goes in only behind the splash, where
  *   the reload goes unseen: at a launch (init() holds the splash up to LAUNCH_WAIT for its
  *   download), or on a return after AWAY_SWAP away. A quick switch to another app never
- *   reloads it. Meanwhile its dialog's Restart puts it in now; Later closes the dialog until a newer one.
+ *   reloads it. One left waiting goes in at the next launch before the manifest is read, so
+ *   a slow network cannot keep it out. Meanwhile its dialog's Restart puts it in now; Later
+ *   closes the dialog until a newer one.
  * - A required version goes in as soon as it is on the phone. Only a download that outlasts
  *   the launch's splash, or starts after it, shows the full screen.
  * - The store build is the floor: a bundle no newer than it, nothing published, or
@@ -196,7 +200,7 @@ export class FsCapacitorUpdate {
       .subscribe();
   }
 
-  /** The dialog's Later: closes it; the version still applies at the next background */
+  /** The dialog's Later: closes it; the version still goes in at the next launch, or a return after AWAY_SWAP away */
   public later(): void {
     this._laterId.set(this._readyId());
   }
@@ -246,7 +250,10 @@ export class FsCapacitorUpdate {
             this._event('fail', `${capacitorUpdateBundleName(failed.bundle.version)} failed to start, so the phone went back to the code before it`);
           }
         }),
-        switchMap(([current]) => current.bundle.id === BUILTIN_ID ? this._recordBuiltin$() : of(null)),
+        switchMap(([current]) => (current.bundle.id === BUILTIN_ID ? this._recordBuiltin$() : of(null))
+          .pipe(
+            switchMap(() => this._launchWaiting$(current.bundle)),
+          )),
         switchMap(() => this._moments$()),
         // A check runs to its end: a return mid-download never strands the full screen
         exhaustMap((moment) => this._check$(moment)
@@ -343,6 +350,12 @@ export class FsCapacitorUpdate {
 
     const version = capacitorUpdateVersion(bundle);
     if (current.version === version) {
+      // The published version is the one running: one left waiting was withdrawn
+      this._clearWaiting();
+      if (this.state() === 'ready') {
+        this.state.set('idle');
+      }
+
       this._result(`Up to date: running ${this._name(bundle)}, the published update`);
 
       return EMPTY;
@@ -396,6 +409,7 @@ export class FsCapacitorUpdate {
     }
 
     this._result(`${this._name(bundle)} downloaded, waiting to go in`);
+    localStorage.setItem(WAITING_KEY, info.id);
     this._readyId.set(info.id);
     this._readyName = this._name(bundle);
     this.readyVersion.set(bundle.version);
@@ -430,6 +444,9 @@ export class FsCapacitorUpdate {
   // The plugin reloads the web view into the bundle. Past the launch the splash comes
   // back up first, so the reload reads as a launch; the new bundle's launch takes it down
   private _set$(bundle: BundleId): Observable<unknown> {
+    // Whatever goes in now, nothing is left waiting for the next launch
+    localStorage.removeItem(WAITING_KEY);
+
     const splash = !this._launching && Capacitor.isPluginAvailable('SplashScreen');
     const splash$: Observable<unknown> = splash ? from(SplashScreen.show({ autoHide: false })) : of(null);
 
@@ -452,8 +469,7 @@ export class FsCapacitorUpdate {
 
   // Back to the store build: behind the launch's splash, else at the next background
   private _toBuiltin$(current: BundleInfo): Observable<unknown> {
-    this._readyId.set(null);
-    this.readyVersion.set(null);
+    this._clearWaiting();
     this.state.set('idle');
 
     if (current.id === BUILTIN_ID) {
@@ -472,9 +488,63 @@ export class FsCapacitorUpdate {
       .pipe(
         tap(([build, native]) => {
           const builtin: CapacitorUpdateBuiltin = { build: build?.date ?? null, nativeLevel: Number(native?.level) || 0 };
+          // A new store build: a version left waiting was checked against the one before it
+          if (builtin.build !== this.builtin?.build) {
+            localStorage.removeItem(WAITING_KEY);
+          }
+
           localStorage.setItem(BUILTIN_KEY, JSON.stringify(builtin));
         }),
       );
+  }
+
+  // A version left waiting (Later, or a launch whose check outlasted LAUNCH_WAIT) goes in
+  // behind this launch's splash before any manifest read, which a slow network could carry
+  // past LAUNCH_WAIT and leave it waiting again. The check after the reload still corrects
+  // it if the manager has moved on since
+  private _launchWaiting$(current: BundleInfo): Observable<unknown> {
+    const id = localStorage.getItem(WAITING_KEY);
+    if (!id || id === current.id) {
+      localStorage.removeItem(WAITING_KEY);
+
+      return of(null);
+    }
+
+    return from(CapacitorUpdater.list())
+      .pipe(
+        map(({ bundles }) => bundles
+          .find((info) => info.id === id && (info.status === 'success' || info.status === 'pending'))),
+        switchMap((info) => {
+          // Gone from the phone, or failed to start here: nothing waits any more
+          if (!info || info.version === this.failedVersion) {
+            localStorage.removeItem(WAITING_KEY);
+
+            return of(null);
+          }
+
+          // The splash is already down: the launch's check offers it in the dialog instead
+          if (!this._launching) {
+            return of(null);
+          }
+
+          // Recorded first: the reload that puts it in ends this web view
+          this._event('apply', `Installed ${capacitorUpdateBundleName(info.version)}, left waiting, at the launch`);
+
+          // A refused reload carries on into the launch's check
+          return this._set$(info)
+            .pipe(
+              defaultIfEmpty(null),
+            );
+        }),
+        catchError(() => of(null)),
+      );
+  }
+
+  // Nothing waits any more: the dialog closes and the next launch installs nothing
+  private _clearWaiting(): void {
+    this._readyId.set(null);
+    this.readyVersion.set(null);
+    localStorage.removeItem(WAITING_KEY);
   }
 
   private _asset$(path: string): Observable<any> {

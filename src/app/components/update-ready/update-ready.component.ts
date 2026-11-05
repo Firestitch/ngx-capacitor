@@ -11,7 +11,7 @@ import { FsCapacitorUpdate } from '../../services/capacitor-update.service';
 /**
  * A new version waiting, as one of the app's own dialogs, pinned to the bottom on a
  * phone. Restart applies it now; Later, the backdrop or Escape leave it for the next
- * background. fs-capacitor-update opens and closes it.
+ * launch, or a return after 10 minutes away. fs-capacitor-update opens and closes it.
  */
 @Component({
   templateUrl: './update-ready.component.html',

@@ -42,7 +42,8 @@ the bundle. A new version downloads in the background and goes in only behind th
 where the reload goes unseen: at a launch, which holds the splash up to 3 seconds for the
 download, or on a return after 10 minutes or more away. A quick switch to another app never
 reloads it. Meanwhile its dialog's Restart puts it in now (Later closes the dialog until a
-newer version). A required one goes in as soon as it is on the phone; its full screen shows
+newer version). One left waiting goes in at the next launch before the manifest is read, so a
+slow network cannot keep it out. A required one goes in as soon as it is on the phone; its full screen shows
 only while a download outlasts the launch's splash or starts after it. The dialog is an
 `fs-dialog`, so it takes the app's own theme. Off on the web and while `manifestUrl` is empty.
 "Update required" sends the phone to the manifest's `storeUrl` for its platform (Deployment
