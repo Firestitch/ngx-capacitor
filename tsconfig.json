@@ -5,6 +5,9 @@
       "@firestitch/capacitor": [
         "src/public_api.ts"
       ],
+      "@firestitch/capacitor/config": [
+        "src/config/public_api.ts"
+      ],
       "@env": [
         "playground/environments/environment.ts"
       ]

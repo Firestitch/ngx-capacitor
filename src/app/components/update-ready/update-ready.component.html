@@ -1,0 +1,24 @@
+<fs-dialog [mobileMode]="'bottom'">
+  <fs-dialog-title>{{ title }}</fs-dialog-title>
+  <mat-dialog-content>
+    @if (version()) {
+      Version {{ version() }} is ready.
+    }
+    Restart now to start using it, or it updates on its own the next time you leave the app.
+  </mat-dialog-content>
+  <mat-dialog-actions>
+    <button
+        mat-button
+        color="primary"
+        type="button"
+        (click)="update.refresh()">
+      Restart
+    </button>
+    <button
+        mat-button
+        type="button"
+        [mat-dialog-close]="undefined">
+      Later
+    </button>
+  </mat-dialog-actions>
+</fs-dialog>

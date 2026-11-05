@@ -1,0 +1,71 @@
+<div class="fs-column.gap-md.align-start">
+  <mat-button-toggle-group
+      aria-label="Update state"
+      [value]="update.state()"
+      (change)="show($event.value)">
+    <mat-button-toggle [value]="'idle'">Idle</mat-button-toggle>
+    <mat-button-toggle [value]="'ready'">New version ready</mat-button-toggle>
+    <mat-button-toggle [value]="'updating'">Required update</mat-button-toggle>
+    <mat-button-toggle [value]="'required'">Store update required</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <div class="fs-row.gap-lg.align-start">
+    <div class="phone">
+      <div class="phone-content">
+        <h2>{{ update.appData.name }}</h2>
+        <p>The app as the person sees it. fs-capacitor-update shows the screens over it, and opens the new-version dialog like any of the app's dialogs (at the bottom below 600px wide).</p>
+        <p>On a device, place one fs-capacitor-update in the root template; the states come from the manifest.</p>
+      </div>
+      <fs-capacitor-update></fs-capacitor-update>
+    </div>
+
+    <div class="fs-column.gap-sm settings">
+      <mat-form-field>
+        <mat-label>Primary</mat-label>
+        <input
+          matInput
+          fsColorPicker
+          name="primary"
+          [ngModel]="update.config().colors?.primary"
+          (ngModelChange)="setColor('primary', $event)">
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Accent</mat-label>
+        <input
+          matInput
+          fsColorPicker
+          name="accent"
+          [ngModel]="update.config().colors?.accent"
+          (ngModelChange)="setColor('accent', $event)">
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Background</mat-label>
+        <input
+          matInput
+          fsColorPicker
+          name="background"
+          [ngModel]="update.config().colors?.background"
+          (ngModelChange)="setColor('background', $event)">
+      </mat-form-field>
+
+      <mat-button-toggle-group
+          aria-label="Icon"
+          [value]="!!update.config().icon"
+          (change)="showIcon($event.value)">
+        <mat-button-toggle [value]="false">Glyph</mat-button-toggle>
+        <mat-button-toggle [value]="true">App icon</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <div>
+        <button
+            mat-button
+            type="button"
+            (click)="resetColors()">
+          Reset colors
+        </button>
+      </div>
+
+      <pre class="snippet">{{ snippet() }}</pre>
+    </div>
+  </div>
+</div>

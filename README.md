@@ -32,3 +32,61 @@ initCapacitor();
   deps: [FsCapacitor],
 }, 
 ```
+
+# Over-the-air updates
+
+The app reads `{manifestUrl}{bundleId}/manifest.json` (published by Environment Manager or
+Deployment Manager) on launch and on resume. Capgo's plugin downloads, verifies and swaps
+the bundle. A new version applies at the next background, or now from its dialog's Restart
+(Later closes the dialog until a newer version); a required one applies at once. The dialog
+is an `fs-dialog`, so it takes the app's own theme. Off on the web and while `manifestUrl` is empty.
+"Update required" sends the phone to the manifest's `storeUrl` for its platform (Deployment
+Manager's builds: the app in TestFlight, by its Apple ID), else to the store listing Capgo's
+plugin finds by the bundle ID.
+
+1. Add the native plugin to the Capacitor app's `package.json`: `"@capgo/capacitor-updater": "6.53.0"`.
+
+2. Each environment file carries the app's Capacitor settings:
+```
+import type { FsCapacitorConfig } from '@firestitch/capacitor/config';
+
+export const environment = {
+  ...
+  capacitor: {
+    update: { manifestUrl: 'https://...s3.amazonaws.com/pub/app/', publicKey: '-----BEGIN RSA PUBLIC KEY-----...' },
+  } satisfies FsCapacitorConfig,
+};
+```
+   `capacitor.config.ts` loads that file in plain Node during `cap sync`, so it may only use
+   relative imports (no tsconfig path aliases).
+
+3. The same object goes to the app and to the native plugins:
+```
+// main.ts
+FsCapacitorModule.forRoot(environment.capacitor),
+
+// capacitor.config.ts: wrap the whole config
+import { FsCapacitorConfigService } from '@firestitch/capacitor/config';
+export default FsCapacitorConfigService.init(config, environment.capacitor);
+```
+   `init()` adds the `CapacitorUpdater` block: manual mode, no Capgo stats, and the public key,
+   which the plugin only reads natively.
+
+4. Once, in the root component's template: `<fs-capacitor-update></fs-capacitor-update>`.
+   Its full screen takes the app's colors and icon from the same `update` block; a color
+   left out or blank keeps its default (`CAPACITOR_UPDATE_COLORS`):
+```
+update: {
+  manifestUrl: '...',
+  publicKey: '...',
+  colors: { primary: '#2F5BEA', accent: '#16A3B8', background: '#0A0F1F' },
+  icon: 'assets/icon.png', // a path in the web bundle or a URL; no plugin reads the native icon
+},
+```
+   The background fills behind the status bar and home indicator, so the app's `index.html`
+   viewport needs `viewport-fit=cover`. On Android the status bar takes the background color
+   while the screen shows.
+
+5. `src/assets/native.json`: `{"level": 1}`. Bump it only when a native plugin or permission
+   changes. A bundle whose level is above the store build's is never installed on it, and
+   Environment/Deployment Manager refuse a zip without this file.

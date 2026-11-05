@@ -1,0 +1,254 @@
+// Defaults only. The screen sits at zero specificity (:where) so an app's own rules for
+// it win; its parts at one class, enough to beat an app's global h1 and p rules. The
+// colors are the host's custom properties, set from the config.
+:where(.fs-capacitor-update-screen) {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  // The background runs under the status bar, home indicator and notch; the content stays clear of them
+  padding:
+    env(safe-area-inset-top)
+    calc(24px + env(safe-area-inset-right))
+    env(safe-area-inset-bottom)
+    calc(24px + env(safe-area-inset-left));
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--fs-capacitor-update-background);
+  color: #fff;
+  text-align: center;
+}
+
+:where(.fs-capacitor-update-screen) {
+  // Soft color fields drifting behind the content. Sized off the screen's width
+  // (padding-top makes them round), so they scale with the device
+  .fs-capacitor-update-glow {
+    position: absolute;
+    height: 0;
+    border-radius: 50%;
+  }
+
+  .fs-capacitor-update-glow-1 {
+    left: 20%;
+    top: 12%;
+    width: 144%;
+    padding-top: 144%;
+    margin: -72% 0 0 -72%;
+    background: radial-gradient(circle, var(--fs-capacitor-update-primary) 0%, transparent 66%);
+    opacity: .9;
+    animation: fs-capacitor-update-drift-1 16s ease-in-out infinite;
+  }
+
+  .fs-capacitor-update-glow-2 {
+    left: 100%;
+    top: 91%;
+    width: 154%;
+    padding-top: 154%;
+    margin: -77% 0 0 -77%;
+    background: radial-gradient(circle, var(--fs-capacitor-update-accent) 0%, transparent 64%);
+    opacity: .7;
+    animation: fs-capacitor-update-drift-2 19s ease-in-out infinite;
+  }
+
+  .fs-capacitor-update-glow-3 {
+    left: 92%;
+    top: 30%;
+    width: 97%;
+    padding-top: 97%;
+    margin: -48.5% 0 0 -48.5%;
+    background: radial-gradient(circle, var(--fs-capacitor-update-accent) 0%, transparent 66%);
+    opacity: .35;
+    animation: fs-capacitor-update-drift-3 23s ease-in-out infinite;
+  }
+
+  // Darkens the middle so the text keeps its contrast over any brand color
+  .fs-capacitor-update-shade {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 75% 40% at 50% 50%, var(--fs-capacitor-update-background), transparent 80%);
+    opacity: .6;
+  }
+
+  .fs-capacitor-update-main {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  .fs-capacitor-update-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 76px;
+    height: 76px;
+    overflow: hidden;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, .2);
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, .1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    svg {
+      width: 34px;
+      height: 34px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+
+  .fs-capacitor-update-bob {
+    animation: fs-capacitor-update-bob 1.6s ease-in-out infinite;
+  }
+
+  .fs-capacitor-update-title {
+    margin: 28px 0 8px;
+    font-size: 26px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    color: inherit;
+  }
+
+  .fs-capacitor-update-text {
+    margin: 0;
+    max-width: 300px;
+    font-size: 15px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, .76);
+  }
+
+  .fs-capacitor-update-progress {
+    width: 260px;
+    max-width: 100%;
+    margin-top: 40px;
+  }
+
+  .fs-capacitor-update-track {
+    position: relative;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .14);
+  }
+
+  .fs-capacitor-update-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--fs-capacitor-update-primary), var(--fs-capacitor-update-accent));
+    box-shadow: 0 0 18px var(--fs-capacitor-update-accent);
+    // The plugin reports the download in jumps; this smooths them
+    transition: width .2s linear;
+
+    // A highlight sweeping across, so a slow download still looks alive
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+      animation: fs-capacitor-update-shine 1.8s ease-in-out infinite;
+    }
+  }
+
+  .fs-capacitor-update-progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, .72);
+  }
+
+  .fs-capacitor-update-percent {
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .fs-capacitor-update-version {
+    margin-top: 16px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, .6);
+  }
+
+  .fs-capacitor-update-footer {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding-bottom: 24px;
+  }
+
+  .fs-capacitor-update-hint {
+    margin: 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, .58);
+  }
+
+  .fs-capacitor-update-action {
+    width: 100%;
+    height: 54px;
+    border: 0;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+    color: var(--fs-capacitor-update-background);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+  }
+}
+
+@keyframes fs-capacitor-update-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(70px, 90px) scale(1.18); }
+}
+
+@keyframes fs-capacitor-update-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1.1); }
+  50% { transform: translate(-80px, -60px) scale(.94); }
+}
+
+@keyframes fs-capacitor-update-drift-3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(50px, -100px); }
+}
+
+@keyframes fs-capacitor-update-shine {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+@keyframes fs-capacitor-update-bob {
+  0%, 100% { transform: translateY(-2px); }
+  50% { transform: translateY(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.fs-capacitor-update-screen) *,
+  :where(.fs-capacitor-update-screen) *::after {
+    animation: none !important;
+  }
+}

@@ -1,43 +1,25 @@
-import { APP_INITIALIZER, Injector, ModuleWithProviders, NgModule } from '@angular/core';
-
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule } from '@angular/material/dialog';
+import { APP_INITIALIZER, ModuleWithProviders, NgModule } from '@angular/core';
 
 import { FsApi } from '@firestitch/api';
-import { FsDialogModule } from '@firestitch/dialog';
 
 import { of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 
-import { UpdateComponent } from './components';
 import { FS_CAPACITOR_CONFIG } from './consts';
-import { CapacitorHttpInterceptor, CapacitorUpdateInterceptor } from './interceptors';
-import { FsCapacitorConfig } from './interfaces';
-import { FsCapacitor, FsCapacitorApi, FsCapacitorHttp } from './services';
+import { CapacitorHttpInterceptor } from './interceptors';
+import { FsCapacitorConfig } from '@firestitch/capacitor/config';
+import { FsCapacitor, FsCapacitorApi, FsCapacitorHttp, FsCapacitorUpdate } from './services';
 
 
-@NgModule({
-    imports: [
-        MatButtonModule,
-        MatDialogModule,
-        FsDialogModule,
-        UpdateComponent,
-    ],
-})
+@NgModule({})
 export class FsCapacitorModule {
   public static forRoot(config: FsCapacitorConfig = {}): ModuleWithProviders<FsCapacitorModule> {
     return {
       ngModule: FsCapacitorModule,
       providers:[
         { provide: FS_CAPACITOR_CONFIG, useValue: config },
-        {
-          provide: HTTP_INTERCEPTORS,
-          useClass: CapacitorUpdateInterceptor,
-          multi: true,
-          deps: [Injector],
-        },
         {
           provide: HTTP_INTERCEPTORS,
           useClass: CapacitorHttpInterceptor,
@@ -49,18 +31,20 @@ export class FsCapacitorModule {
           provide: APP_INITIALIZER,
           useFactory: (
             capacitor: FsCapacitor,
+            update: FsCapacitorUpdate,
           ) => {
             return () => of(null)
               .pipe(
+                // Started first and not waited on: a downloaded bundle must report
+                // itself started before anything slow, or the plugin rolls it back
+                tap(() => update.init(config.update)),
                 switchMap(() => capacitor.init()),
               );
           },
           multi: true,
-          deps: [FsCapacitor],
+          deps: [FsCapacitor, FsCapacitorUpdate],
         },
       ],
     };
   }
 }
-
-

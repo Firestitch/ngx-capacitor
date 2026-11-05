@@ -1,2 +1,2 @@
 export * from './capacitor-config';
-export * from './capacitor-update-token';
+export * from './capacitor-update-colors';

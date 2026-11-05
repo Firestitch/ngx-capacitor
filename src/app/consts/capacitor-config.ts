@@ -1,3 +1,5 @@
 import { InjectionToken } from '@angular/core';
 
-export const FS_CAPACITOR_CONFIG = new InjectionToken<any[]>('fs-cordova-config');
+import { FsCapacitorConfig } from '@firestitch/capacitor/config';
+
+export const FS_CAPACITOR_CONFIG = new InjectionToken<FsCapacitorConfig>('fs-capacitor-config');

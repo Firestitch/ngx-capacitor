@@ -1,3 +1,2 @@
 export * from './examples';
-export * from './cordova';
-
+export * from './update';

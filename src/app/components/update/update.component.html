@@ -1,15 +1,90 @@
-<fs-dialog [mobileMode]="'float'">
-  <h1 mat-dialog-title>New Version Available</h1>
-  <mat-dialog-content>
-    There is a newer version of this app available
-  </mat-dialog-content>
-  <mat-dialog-actions>
-    <button 
-        mat-button
-        type="button"
-        (click)="update()"
-        color="primary">
-      Update
-    </button>
-  </mat-dialog-actions>
-</fs-dialog>
+@if (screen()) {
+  <div class="fs-capacitor-update-screen">
+    <div
+        class="fs-capacitor-update-glow fs-capacitor-update-glow-1"
+        aria-hidden="true">
+    </div>
+    <div
+        class="fs-capacitor-update-glow fs-capacitor-update-glow-2"
+        aria-hidden="true">
+    </div>
+    <div
+        class="fs-capacitor-update-glow fs-capacitor-update-glow-3"
+        aria-hidden="true">
+    </div>
+    <div
+        class="fs-capacitor-update-shade"
+        aria-hidden="true">
+    </div>
+
+    <div class="fs-capacitor-update-main">
+      <div class="fs-capacitor-update-icon">
+        @if (icon()) {
+          <img
+            alt=""
+            [src]="icon()"
+            (error)="iconFailed()">
+        } @else if (update.state() === 'updating') {
+          <svg
+              class="fs-capacitor-update-bob"
+              viewBox="0 0 24 24"
+              aria-hidden="true">
+            <path d="M12 4v11"></path>
+            <path d="M7 10l5 5 5-5"></path>
+            <path d="M5 20h14"></path>
+          </svg>
+        } @else {
+          <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true">
+            <path d="M12 20V8"></path>
+            <path d="M7 13l5-5 5 5"></path>
+            <path d="M5 4h14"></path>
+          </svg>
+        }
+      </div>
+
+      @if (update.state() === 'updating') {
+        <h1 class="fs-capacitor-update-title">Getting the latest version</h1>
+        <p class="fs-capacitor-update-text">{{ update.appData.name || 'The app' }} restarts on its own when it’s done.</p>
+        <div class="fs-capacitor-update-progress">
+          <div
+              class="fs-capacitor-update-track"
+              role="progressbar"
+              aria-label="Downloading the update"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              [attr.aria-valuenow]="update.progress()">
+            <div
+              class="fs-capacitor-update-fill"
+              [style.width.%]="update.progress()">
+            </div>
+          </div>
+          <div class="fs-capacitor-update-progress-label">
+            <span>{{ update.progress() < 100 ? 'Downloading' : 'Restarting…' }}</span>
+            <span class="fs-capacitor-update-percent">{{ update.progress() }}%</span>
+          </div>
+        </div>
+      } @else {
+        <h1 class="fs-capacitor-update-title">Update required</h1>
+        <p class="fs-capacitor-update-text">This version of {{ update.appData.name || 'the app' }} is out of date. Install the latest version to keep using it.</p>
+        @if (update.appData.version) {
+          <div class="fs-capacitor-update-version">Installed {{ update.appData.version }}</div>
+        }
+      }
+    </div>
+
+    <div class="fs-capacitor-update-footer">
+      @if (update.state() === 'updating') {
+        <p class="fs-capacitor-update-hint">Keep the app open until it finishes.</p>
+      } @else {
+        <button
+            class="fs-capacitor-update-action"
+            type="button"
+            (click)="update.openStore()">
+          Update
+        </button>
+      }
+    </div>
+  </div>
+}
