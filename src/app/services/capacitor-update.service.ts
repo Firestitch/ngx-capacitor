@@ -1,20 +1,32 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+
+import { CapacitorUpdateConfig } from '@firestitch/capacitor/config';
+
+import { EMPTY, Observable, ReplaySubject, Subject, forkJoin, from, merge, of, race, timer } from 'rxjs';
+import { catchError, exhaustMap, filter, finalize, map, share, switchMap, take, tap } from 'rxjs/operators';
+
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-
-import { EMPTY, Observable, ReplaySubject, forkJoin, from, merge, of, race, timer } from 'rxjs';
-import { catchError, filter, finalize, map, switchMap, take, tap } from 'rxjs/operators';
-
 import { App } from '@capacitor/app';
 import { Capacitor, CapacitorHttp, HttpResponse } from '@capacitor/core';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { BundleId, BundleInfo, CapacitorUpdater } from '@capgo/capacitor-updater';
 
-import { CapacitorUpdateConfig } from '@firestitch/capacitor/config';
 
 import {
+  CAPACITOR_UPDATE_AWAY_SWAP,
+  CAPACITOR_UPDATE_CHECK_EVERY,
+  CAPACITOR_UPDATE_LAUNCH_WAIT,
+} from '../consts/capacitor-update-timing';
+import { capacitorUpdateBundleName, capacitorUpdateVersion } from '../helpers/capacitor-update-bundle-name';
+import {
   CapacitorUpdateAppData,
+  CapacitorUpdateBuiltin,
   CapacitorUpdateBundle,
+  CapacitorUpdateCheck,
+  CapacitorUpdateEvent,
+  CapacitorUpdateEventKind,
   CapacitorUpdateManifest,
+  CapacitorUpdateMoment,
   CapacitorUpdateState,
 } from '../interfaces';
 
@@ -24,23 +36,16 @@ const MANIFEST_FORMAT = 1;
 const BUILTIN_ID = 'builtin';
 const BUILTIN_KEY = 'fs-capacitor-update-builtin';
 const FAILED_KEY = 'fs-capacitor-update-failed';
-// How long the launch's splash waits for a new version to download behind it
-const LAUNCH_WAIT = 3000;
-// Back after this long away, a version already downloaded goes in behind the splash, as at a launch
-const AWAY_SWAP = 10 * 60 * 1000;
-
-/** The store build's own bundle, recorded while it runs: the floor every manifest is measured against */
-interface Builtin {
-  build: string | null;
-  nativeLevel: number;
-}
-
-/** When the manifest is read: the launch, a return after AWAY_SWAP or more, or a quick return */
-type CheckMoment = 'launch' | 'away' | 'back';
+const CHECK_KEY = 'fs-capacitor-update-check';
+const EVENTS_KEY = 'fs-capacitor-update-events';
+// The history keeps this many of the newest events
+const EVENT_LIMIT = 20;
+const MANIFEST_TIMEOUT = 10000;
 
 /**
  * Over-the-air updates of the app's web code. The app reads its manifest from
- * {manifestUrl}{bundleId}/manifest.json on launch and on resume; Capgo's plugin
+ * {manifestUrl}{bundleId}/manifest.json at launch, on each return to the front, and every
+ * CHECK_EVERY while the app stays in front; Capgo's plugin
  * downloads, verifies (capacitor.config's CapacitorUpdater.publicKey) and swaps the bundle.
  *
  * - A new version downloads in the background and goes in only behind the splash, where
@@ -76,16 +81,30 @@ export class FsCapacitorUpdate {
   /** The waiting version was put off with Later: its dialog stays closed, and opens for a newer one */
   public readonly postponed = computed(() => this._laterId() !== null && this._laterId() === this._readyId());
 
+  /** The last manifest read on this phone and what it found; kept across launches */
+  public readonly lastCheck = signal<CapacitorUpdateCheck | null>(this._stored(CHECK_KEY));
+
+  /** What the updater did on this phone, newest first; kept across launches */
+  public readonly events = signal<CapacitorUpdateEvent[]>(this._stored(EVENTS_KEY) || []);
+
+  /** When the timer checks next (ISO 8601); null while a check runs or the app is in the background */
+  public readonly nextCheck = signal<string | null>(null);
+
   public appData: CapacitorUpdateAppData = {};
 
   private _destroyRef = inject(DestroyRef);
-  private _manifestUrl: string;
+  private _enabled = false;
   private _readyId = signal<string | null>(null);
   private _laterId = signal<string | null>(null);
   private _storeUrl: string | null = null;
   // The launch's splash is still up: a version on the phone by now goes in unseen
   private _launching = true;
   private _launchChecked$ = new ReplaySubject<void>(1);
+  private _checkEnded$ = new Subject<void>();
+  // In front the timer runs; in the background it waits for the return
+  private _front = true;
+  // The waiting version's name, for the history
+  private _readyName: string | null = null;
 
   public get version(): string {
     return this.appData.version;
@@ -101,6 +120,26 @@ export class FsCapacitorUpdate {
 
   public get platform(): 'android' | 'ios' | 'web' {
     return Capacitor.getPlatform() as 'android' | 'ios' | 'web';
+  }
+
+  /** Updates run here: a phone, a manifestUrl, and the plugin to apply what it names */
+  public get enabled(): boolean {
+    return this._enabled;
+  }
+
+  /** {manifestUrl}{bundleId}/manifest.json; null while updates are off */
+  public get manifestUrl(): string | null {
+    return this._enabled ? `${this.config().manifestUrl}${this.bundleIdentifier}/manifest.json` : null;
+  }
+
+  /** The store build's stamp and native level, as recorded the last time it ran */
+  public get builtin(): CapacitorUpdateBuiltin | null {
+    return this._stored(BUILTIN_KEY);
+  }
+
+  /** The last bundle that failed to start here, which every later check skips */
+  public get failedVersion(): string | null {
+    return localStorage.getItem(FAILED_KEY);
   }
 
   /**
@@ -121,6 +160,7 @@ export class FsCapacitorUpdate {
     }
 
     const enabled = !!config.manifestUrl && Capacitor.isPluginAvailable('CapacitorUpdater');
+    this._enabled = enabled;
 
     from(App.getInfo())
       .pipe(
@@ -134,8 +174,13 @@ export class FsCapacitorUpdate {
           };
         }),
         filter(() => enabled),
-        tap(() => this._manifestUrl = config.manifestUrl),
         switchMap(() => this._start$()),
+        // The plugin could not answer: no updates this session, and the splash need not wait
+        catchError(() => {
+          this._launchChecked$.next();
+
+          return EMPTY;
+        }),
         takeUntilDestroyed(this._destroyRef),
       )
       .subscribe();
@@ -145,6 +190,7 @@ export class FsCapacitorUpdate {
 
   /** The dialog's Restart: the downloaded version, now */
   public refresh(): void {
+    this._event('apply', `Installed ${this._readyName} with Restart`);
     this._set$({ id: this._readyId() })
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe();
@@ -167,8 +213,21 @@ export class FsCapacitorUpdate {
     CapacitorUpdater.openAppStore({});
   }
 
+  /**
+   * The manifest as the server publishes it now, read natively (S3 sends no CORS headers),
+   * past any cache, and timed out so a dead network ends the read
+   */
+  public manifest$(): Observable<HttpResponse> {
+    return from(CapacitorHttp.get({
+      url: this.manifestUrl,
+      params: { t: String(Date.now()) },
+      connectTimeout: MANIFEST_TIMEOUT,
+      readTimeout: MANIFEST_TIMEOUT,
+    }));
+  }
+
   private _launch$(): Observable<void> {
-    return race(this._launchChecked$, timer(LAUNCH_WAIT))
+    return race(this._launchChecked$, timer(CAPACITOR_UPDATE_LAUNCH_WAIT))
       .pipe(
         take(1),
         map(() => null),
@@ -184,59 +243,69 @@ export class FsCapacitorUpdate {
         tap(([, failed]) => {
           if (failed?.bundle?.version) {
             localStorage.setItem(FAILED_KEY, failed.bundle.version);
+            this._event('fail', `${capacitorUpdateBundleName(failed.bundle.version)} failed to start, so the phone went back to the code before it`);
           }
         }),
         switchMap(([current]) => current.bundle.id === BUILTIN_ID ? this._recordBuiltin$() : of(null)),
-        switchMap(() => merge(
-          of<CheckMoment>('launch'),
-          this._resume$().pipe(map((away): CheckMoment => away >= AWAY_SWAP ? 'away' : 'back')),
-        )),
-        switchMap((moment) => this._check$(moment)
+        switchMap(() => this._moments$()),
+        // A check runs to its end: a return mid-download never strands the full screen
+        exhaustMap((moment) => this._check$(moment)
           .pipe(
             // The launch's check is through however it ends: the splash need not wait longer
             finalize(() => {
               if (moment === 'launch') {
                 this._launchChecked$.next();
               }
+
+              this._checkEnded$.next();
             }),
           )),
       );
   }
 
-  private _check$(moment: CheckMoment): Observable<unknown> {
-    return forkJoin([this._manifest$(), from(CapacitorUpdater.current())])
+  private _check$(moment: CapacitorUpdateMoment): Observable<unknown> {
+    this._checked(moment);
+
+    return forkJoin([this.manifest$(), from(CapacitorUpdater.current())])
       .pipe(
         switchMap(([response, current]) => this._apply$(response, current.bundle, moment)),
         // Offline or a refused download: nothing changes, the next check tries again
-        catchError(() => EMPTY),
+        catchError((error) => {
+          this._result(`Could not reach the update server: ${error?.message || 'unknown error'}`);
+
+          return EMPTY;
+        }),
       );
   }
 
-  // A native request: S3 sends no CORS headers
-  private _manifest$(): Observable<HttpResponse> {
-    return from(CapacitorHttp.get({
-      url: `${this._manifestUrl}${this.bundleIdentifier}/manifest.json`,
-      params: { t: String(Date.now()) },
-    }));
-  }
-
-  private _apply$(response: HttpResponse, current: BundleInfo, moment: CheckMoment): Observable<unknown> {
+  private _apply$(response: HttpResponse, current: BundleInfo, moment: CapacitorUpdateMoment): Observable<unknown> {
     // S3 answers 403 for a manifest that is not there: nothing is published
     if (response.status === 403 || response.status === 404) {
+      this._result('Nothing is published for this app');
+
       return this._toBuiltin$(current);
+    }
+
+    if (response.status !== 200) {
+      this._result(`The update server answered ${response.status}`);
+
+      return EMPTY;
     }
 
     // S3 serves it as text/json, which can arrive unparsed
     const manifest: CapacitorUpdateManifest = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-    if (response.status !== 200 || manifest?.format !== MANIFEST_FORMAT || manifest.bundleId !== this.bundleIdentifier) {
+    if (manifest?.format !== MANIFEST_FORMAT || manifest.bundleId !== this.bundleIdentifier) {
+      this._result('The manifest is for another app or format');
+
       return EMPTY;
     }
 
     // An App Store lookup by bundle id never finds a TestFlight build: the manager says where to go
     this._storeUrl = manifest.storeUrl?.[this.platform] ?? null;
 
-    if (this._isBelow(manifest.minVersion?.[this.platform])) {
-      this.state.set('required');
+    const minVersion = manifest.minVersion?.[this.platform];
+    if (this._isBelow(minVersion)) {
+      this._required(`Store version ${minVersion} or later required`);
 
       return EMPTY;
     }
@@ -248,22 +317,40 @@ export class FsCapacitorUpdate {
     return this._applyBundle$(manifest.bundle, current, moment);
   }
 
-  private _applyBundle$(bundle: CapacitorUpdateBundle | null, current: BundleInfo, moment: CheckMoment): Observable<unknown> {
-    const builtin: Builtin | null = JSON.parse(localStorage.getItem(BUILTIN_KEY));
+  private _applyBundle$(
+    bundle: CapacitorUpdateBundle | null,
+    current: BundleInfo,
+    moment: CapacitorUpdateMoment,
+  ): Observable<unknown> {
+    const builtin = this.builtin;
     if (!builtin || !bundle || !(Date.parse(bundle.build) > (Date.parse(builtin.build) || 0))) {
+      this._result(bundle
+        ? `The published update, ${this._name(bundle)}, is not newer than this store build`
+        : 'Updates are stopped in the manager');
+
       return this._toBuiltin$(current);
     }
 
     if (bundle.nativeLevel > builtin.nativeLevel) {
       if (bundle.required) {
-        this.state.set('required');
+        this._required(`${this._name(bundle)} needs a newer store build`);
+      } else {
+        this._result(`${this._name(bundle)} needs a newer store build, so it is skipped`);
       }
 
       return EMPTY;
     }
 
-    const version = `${bundle.version}+${bundle.checksum.slice(0, 12)}`;
-    if (current.version === version || localStorage.getItem(FAILED_KEY) === version) {
+    const version = capacitorUpdateVersion(bundle);
+    if (current.version === version) {
+      this._result(`Up to date: running ${this._name(bundle)}, the published update`);
+
+      return EMPTY;
+    }
+
+    if (this.failedVersion === version) {
+      this._result(`${this._name(bundle)} failed to start here before, so it is skipped`);
+
       return EMPTY;
     }
 
@@ -272,18 +359,21 @@ export class FsCapacitorUpdate {
 
   // One already on the phone goes in at a launch or a return from away; a fresh download
   // only while the launch's splash is still up. A required one goes in either way
-  private _install$(bundle: CapacitorUpdateBundle, version: string, moment: CheckMoment): Observable<unknown> {
+  private _install$(bundle: CapacitorUpdateBundle, version: string, moment: CapacitorUpdateMoment): Observable<unknown> {
     return this._downloaded$(version)
       .pipe(
         switchMap((info) => info
           ? this._place$(bundle, info, moment === 'away' || this._launching)
           : this._download$(bundle, version)
             .pipe(
+              tap(() => this._event('download', `Downloaded ${this._name(bundle)}`)),
               switchMap((downloaded) => this._place$(bundle, downloaded, this._launching)),
             )),
         // A required download that fails lets the person back in
-        catchError(() => {
+        catchError((error) => {
           this.state.set('idle');
+          this._event('error', `${this._name(bundle)} did not download: ${error?.message || 'unknown error'}`);
+          this._result(`${this._name(bundle)} did not download`);
 
           return EMPTY;
         }),
@@ -293,10 +383,21 @@ export class FsCapacitorUpdate {
   // In now, or waiting for the next unseen moment with its dialog offering it meanwhile
   private _place$(bundle: CapacitorUpdateBundle, info: BundleInfo, swap: boolean): Observable<unknown> {
     if (bundle.required || swap) {
+      // Recorded first: the reload that puts it in ends this web view
+      this._event('apply', `Installed ${this._name(bundle)}`);
+      this._result(`Installed ${this._name(bundle)}`);
+
       return this._set$(info);
     }
 
+    // Each check finds it waiting again: the history records it once
+    if (this._readyId() !== info.id) {
+      this._event('ready', `${this._name(bundle)} downloaded, waiting to go in`);
+    }
+
+    this._result(`${this._name(bundle)} downloaded, waiting to go in`);
     this._readyId.set(info.id);
+    this._readyName = this._name(bundle);
     this.readyVersion.set(bundle.version);
     this.state.set('ready');
 
@@ -335,8 +436,17 @@ export class FsCapacitorUpdate {
     return splash$
       .pipe(
         switchMap(() => from(CapacitorUpdater.set(bundle))),
-        // The reload refused: the splash comes down over the version still running
-        catchError(() => splash ? from(SplashScreen.hide()) : EMPTY),
+        // The reload refused: the version still running carries on, out from behind the
+        // splash and the full screen
+        catchError((error) => {
+          this._event('error', `The plugin did not install it: ${error?.message || 'unknown error'}`);
+
+          if (this.state() === 'updating') {
+            this.state.set('idle');
+          }
+
+          return splash ? from(SplashScreen.hide()) : EMPTY;
+        }),
       );
   }
 
@@ -350,6 +460,8 @@ export class FsCapacitorUpdate {
       return EMPTY;
     }
 
+    this._event('store', this._launching ? 'Back to the store build' : 'Back to the store build at the next launch');
+
     return this._launching
       ? from(CapacitorUpdater.set({ id: BUILTIN_ID }))
       : from(CapacitorUpdater.next({ id: BUILTIN_ID }));
@@ -359,7 +471,7 @@ export class FsCapacitorUpdate {
     return forkJoin([this._asset$('assets/build.json'), this._asset$('assets/native.json')])
       .pipe(
         tap(([build, native]) => {
-          const builtin: Builtin = { build: build?.date ?? null, nativeLevel: Number(native?.level) || 0 };
+          const builtin: CapacitorUpdateBuiltin = { build: build?.date ?? null, nativeLevel: Number(native?.level) || 0 };
           localStorage.setItem(BUILTIN_KEY, JSON.stringify(builtin));
         }),
       );
@@ -372,11 +484,55 @@ export class FsCapacitorUpdate {
       );
   }
 
-  // Each return to the app, with how long it was away
-  private _resume$(): Observable<number> {
-    return new Observable<number>((subscriber) => {
+  // The launch, each return to the front, and the timer while the app stays in front
+  private _moments$(): Observable<CapacitorUpdateMoment> {
+    const lifecycle$ = this._lifecycle$()
+      .pipe(
+        tap((away: number | null) => this._front = away !== null),
+        share(),
+      );
+
+    return merge(
+      of<CapacitorUpdateMoment>('launch'),
+      lifecycle$
+        .pipe(
+          filter((away: number | null) => away !== null),
+          map((away: number): CapacitorUpdateMoment => away >= CAPACITOR_UPDATE_AWAY_SWAP ? 'away' : 'back'),
+        ),
+      this._timer$(lifecycle$),
+    );
+  }
+
+  // In front, the next check comes CHECK_EVERY after the last one ends. In the background
+  // none: the return checks at once
+  private _timer$(lifecycle$: Observable<number | null>): Observable<CapacitorUpdateMoment> {
+    return merge(
+      this._checkEnded$.pipe(map(() => this._front)),
+      lifecycle$
+        .pipe(
+          filter((away: number | null) => away === null),
+          map(() => false),
+        ),
+    )
+      .pipe(
+        switchMap((front: boolean) => {
+          this.nextCheck.set(front ? new Date(Date.now() + CAPACITOR_UPDATE_CHECK_EVERY).toISOString() : null);
+
+          return front
+            ? timer(CAPACITOR_UPDATE_CHECK_EVERY).pipe(map((): CapacitorUpdateMoment => 'timer'))
+            : EMPTY;
+        }),
+      );
+  }
+
+  // Each move to the background (null), and each return to the front with how long it was away
+  private _lifecycle$(): Observable<number | null> {
+    return new Observable<number | null>((subscriber) => {
       let pausedAt = Date.now();
-      const pause = App.addListener('pause', () => pausedAt = Date.now());
+      const pause = App.addListener('pause', () => {
+        pausedAt = Date.now();
+        subscriber.next(null);
+      });
       const resume = App.addListener('resume', () => subscriber.next(Date.now() - pausedAt));
 
       return () => {
@@ -384,6 +540,53 @@ export class FsCapacitorUpdate {
         resume.then((listener) => listener.remove());
       };
     });
+  }
+
+  // Store update required: the history records it once, not at every check that finds it
+  private _required(result: string): void {
+    if (this.state() !== 'required') {
+      this._event('required', result);
+    }
+
+    this.state.set('required');
+    this._result(result);
+  }
+
+  // A check starts: its moment now, its result once it has one
+  private _checked(moment: CapacitorUpdateMoment): void {
+    this.lastCheck.set({ date: new Date().toISOString(), moment, result: 'Checking' });
+    this.nextCheck.set(null);
+    this._store(CHECK_KEY, this.lastCheck());
+  }
+
+  // A published bundle as the managers list it: "4.0.2 (checksum 3fa9c1e0b2d4)"
+  private _name(bundle: CapacitorUpdateBundle): string {
+    return capacitorUpdateBundleName(capacitorUpdateVersion(bundle));
+  }
+
+  private _result(result: string): void {
+    this.lastCheck.update((check) => check ? { ...check, result } : check);
+    this._store(CHECK_KEY, this.lastCheck());
+  }
+
+  // Stored at once: anything that reloads the web view next would lose it otherwise
+  private _event(kind: CapacitorUpdateEventKind, message: string): void {
+    const event: CapacitorUpdateEvent = { date: new Date().toISOString(), kind, message };
+
+    this.events.update((events) => [event, ...events].slice(0, EVENT_LIMIT));
+    this._store(EVENTS_KEY, this.events());
+  }
+
+  private _stored<T>(key: string): T | null {
+    try {
+      return JSON.parse(localStorage.getItem(key));
+    } catch {
+      return null;
+    }
+  }
+
+  private _store(key: string, value: unknown): void {
+    localStorage.setItem(key, JSON.stringify(value));
   }
 
   // This store build's version against a minimum like 4.0.2, number by number

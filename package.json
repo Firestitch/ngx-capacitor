@@ -1,7 +1,7 @@
 {
   "name": "@firestitch/capacitor",
   "title": "Capacitor",
-  "version": "18.1.1",
+  "version": "18.2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Firestitch/ngx-capacitor"
@@ -46,6 +46,7 @@
     "@firestitch/autocomplete-chips": "^18.0.35",
     "@firestitch/chip": "^18.0.15",
     "@firestitch/clear": "^18.0.10",
+    "@firestitch/clipboard": "^18.0.6",
     "@firestitch/colorpicker": "^18.0.9",
     "@firestitch/common": "^18.0.1",
     "@firestitch/component-tools": "^18.0.16",
@@ -65,6 +66,7 @@
     "@firestitch/message": "^18.0.2",
     "@firestitch/prompt": "^18.0.9",
     "@firestitch/scroll-picker": "^18.0.0",
+    "@firestitch/skeleton": "^18.0.3",
     "@firestitch/store": "^18.0.0",
     "@firestitch/style": "^18.0.38",
     "@firestitch/upload": "^18.0.1",

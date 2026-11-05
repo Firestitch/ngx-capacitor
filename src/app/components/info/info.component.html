@@ -1,0 +1,37 @@
+<fs-dialog [mobileMode]="'bottom'">
+  <fs-dialog-title>App info</fs-dialog-title>
+  <mat-dialog-content>
+    <div *fsSkeleton="sections()">
+      @for (section of sections(); track section.name) {
+        <div class="section">
+          <h3>{{ section.name }}</h3>
+          @if (section.note) {
+            <p class="small note">{{ section.note }}</p>
+          }
+          @for (row of section.rows; track $index) {
+            <fs-label-field>
+              <fs-label>{{ row.label }}</fs-label>
+              <span class="value">{{ row.value }}</span>
+            </fs-label-field>
+          }
+        </div>
+      }
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions>
+    <button
+        mat-button
+        color="primary"
+        type="button"
+        fsClipboard
+        [content]="text()">
+      Copy details
+    </button>
+    <button
+        mat-button
+        type="button"
+        [mat-dialog-close]="undefined">
+      Close
+    </button>
+  </mat-dialog-actions>
+</fs-dialog>

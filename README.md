@@ -36,7 +36,8 @@ initCapacitor();
 # Over-the-air updates
 
 The app reads `{manifestUrl}{bundleId}/manifest.json` (published by Environment Manager or
-Deployment Manager) on launch and on resume. Capgo's plugin downloads, verifies and swaps
+Deployment Manager) at launch, on each return to the front, and every 15 minutes while the app
+stays in front. Capgo's plugin downloads, verifies and swaps
 the bundle. A new version downloads in the background and goes in only behind the splash,
 where the reload goes unseen: at a launch, which holds the splash up to 3 seconds for the
 download, or on a return after 10 minutes or more away. A quick switch to another app never
@@ -96,3 +97,13 @@ update: {
 5. `src/assets/native.json`: `{"level": 1}`. Bump it only when a native plugin or permission
    changes. A bundle whose level is above the store build's is never installed on it, and
    Environment/Deployment Manager refuse a zip without this file.
+
+6. Optional: `<fs-capacitor-version></fs-capacitor-version>` wherever the app shows its version.
+   It prints "App version 3.0.3 (42)" as plain text for the app to style, and hides itself on
+   the web. A double tap opens App info (`FsCapacitorInfoComponent`): the store build, the web
+   code running, the updater's last check with its result and the countdown to the next, the
+   updates on the phone by version and checksum (the first 12 characters, as Environment and
+   Deployment Manager list them), the history, the manifest as published now, and the device,
+   with Copy details. The updater keeps its last check (`lastCheck`) and its history (`events`,
+   newest 20) in local storage, so both survive a reload into a new bundle; `nextCheck` is the
+   timer's next check while the app is in front.

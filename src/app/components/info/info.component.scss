@@ -1,0 +1,17 @@
+.section + .section {
+  margin-top: 20px;
+}
+
+h3 {
+  margin: 0 0 5px;
+}
+
+.note {
+  margin: 0 0 10px;
+  opacity: .7;
+}
+
+// A URL, an ID or a checksum is one long word: it breaks anywhere rather than widening the dialog
+.value {
+  overflow-wrap: anywhere;
+}
