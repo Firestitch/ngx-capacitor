@@ -1,12 +1,13 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { EMPTY, Observable, forkJoin, from, merge, of } from 'rxjs';
-import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, Observable, ReplaySubject, forkJoin, from, merge, of, race, timer } from 'rxjs';
+import { catchError, filter, finalize, map, switchMap, take, tap } from 'rxjs/operators';
 
 import { App } from '@capacitor/app';
 import { Capacitor, CapacitorHttp, HttpResponse } from '@capacitor/core';
-import { BundleInfo, CapacitorUpdater } from '@capgo/capacitor-updater';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { BundleId, BundleInfo, CapacitorUpdater } from '@capgo/capacitor-updater';
 
 import { CapacitorUpdateConfig } from '@firestitch/capacitor/config';
 
@@ -23,6 +24,10 @@ const MANIFEST_FORMAT = 1;
 const BUILTIN_ID = 'builtin';
 const BUILTIN_KEY = 'fs-capacitor-update-builtin';
 const FAILED_KEY = 'fs-capacitor-update-failed';
+// How long the launch's splash waits for a new version to download behind it
+const LAUNCH_WAIT = 3000;
+// Back after this long away, a version already downloaded goes in behind the splash, as at a launch
+const AWAY_SWAP = 10 * 60 * 1000;
 
 /** The store build's own bundle, recorded while it runs: the floor every manifest is measured against */
 interface Builtin {
@@ -30,21 +35,27 @@ interface Builtin {
   nativeLevel: number;
 }
 
+/** When the manifest is read: the launch, a return after AWAY_SWAP or more, or a quick return */
+type CheckMoment = 'launch' | 'away' | 'back';
+
 /**
  * Over-the-air updates of the app's web code. The app reads its manifest from
  * {manifestUrl}{bundleId}/manifest.json on launch and on resume; Capgo's plugin
  * downloads, verifies (capacitor.config's CapacitorUpdater.publicKey) and swaps the bundle.
  *
+ * - A new version downloads in the background and goes in only behind the splash, where
+ *   the reload goes unseen: at a launch (init() holds the splash up to LAUNCH_WAIT for its
+ *   download), or on a return after AWAY_SWAP away. A quick switch to another app never
+ *   reloads it. Meanwhile its dialog's Restart puts it in now; Later closes the dialog until a newer one.
+ * - A required version goes in as soon as it is on the phone. Only a download that outlasts
+ *   the launch's splash, or starts after it, shows the full screen.
  * - The store build is the floor: a bundle no newer than it, nothing published, or
- *   updates stopped all go back to it at the next background. So a newer store build
- *   always wins, and pointing the manifest at an older bundle rolls phones back.
+ *   updates stopped all go back to it. So a newer store build always wins, and pointing
+ *   the manifest at an older bundle rolls phones back.
  * - A store version below the manifest's minVersion, or a required bundle needing a
  *   native level above the store build's (assets/native.json), shows "Update required".
  *   Its Update opens the manifest's storeUrl for the platform, else the store listing.
  * - A bundle needing a higher native level, or one that failed to start here, is skipped.
- * - A new version applies at the next background; its dialog's Restart applies it now,
- *   its Later closes the dialog until a newer one. A required one downloads behind a
- *   full screen and applies at once.
  */
 @Injectable({
   providedIn: 'root',
@@ -72,6 +83,9 @@ export class FsCapacitorUpdate {
   private _readyId = signal<string | null>(null);
   private _laterId = signal<string | null>(null);
   private _storeUrl: string | null = null;
+  // The launch's splash is still up: a version on the phone by now goes in unseen
+  private _launching = true;
+  private _launchChecked$ = new ReplaySubject<void>(1);
 
   public get version(): string {
     return this.appData.version;
@@ -89,17 +103,24 @@ export class FsCapacitorUpdate {
     return Capacitor.getPlatform() as 'android' | 'ios' | 'web';
   }
 
-  public init(config: CapacitorUpdateConfig = {}): void {
+  /**
+   * Starts the updates and returns the launch's wait: it completes once the launch's
+   * check is through, or after LAUNCH_WAIT with the download carrying on. Until then
+   * the splash stays up (FsCapacitorModule hides it), so a version that arrives goes in unseen.
+   */
+  public init(config: CapacitorUpdateConfig = {}): Observable<void> {
     this.config.set(config);
 
     if (!Capacitor.isNativePlatform()) {
-      return;
+      return of(null);
     }
 
     if (Capacitor.isPluginAvailable('CapacitorUpdater')) {
       // First: a bundle that got this far has started, so the plugin keeps it
       CapacitorUpdater.notifyAppReady();
     }
+
+    const enabled = !!config.manifestUrl && Capacitor.isPluginAvailable('CapacitorUpdater');
 
     from(App.getInfo())
       .pipe(
@@ -112,17 +133,21 @@ export class FsCapacitorUpdate {
             platform: this.platform,
           };
         }),
-        filter(() => !!config.manifestUrl && Capacitor.isPluginAvailable('CapacitorUpdater')),
+        filter(() => enabled),
         tap(() => this._manifestUrl = config.manifestUrl),
         switchMap(() => this._start$()),
         takeUntilDestroyed(this._destroyRef),
       )
       .subscribe();
+
+    return enabled ? this._launch$() : of(null);
   }
 
   /** The dialog's Restart: the downloaded version, now */
   public refresh(): void {
-    CapacitorUpdater.set({ id: this._readyId() });
+    this._set$({ id: this._readyId() })
+      .pipe(takeUntilDestroyed(this._destroyRef))
+      .subscribe();
   }
 
   /** The dialog's Later: closes it; the version still applies at the next background */
@@ -142,6 +167,15 @@ export class FsCapacitorUpdate {
     CapacitorUpdater.openAppStore({});
   }
 
+  private _launch$(): Observable<void> {
+    return race(this._launchChecked$, timer(LAUNCH_WAIT))
+      .pipe(
+        take(1),
+        map(() => null),
+        finalize(() => this._launching = false),
+      );
+  }
+
   private _start$(): Observable<unknown> {
     CapacitorUpdater.addListener('download', (event) => this.progress.set(Math.round(event.percent)));
 
@@ -153,15 +187,26 @@ export class FsCapacitorUpdate {
           }
         }),
         switchMap(([current]) => current.bundle.id === BUILTIN_ID ? this._recordBuiltin$() : of(null)),
-        switchMap(() => merge(of(null), this._resume$())),
-        switchMap(() => this._check$()),
+        switchMap(() => merge(
+          of<CheckMoment>('launch'),
+          this._resume$().pipe(map((away): CheckMoment => away >= AWAY_SWAP ? 'away' : 'back')),
+        )),
+        switchMap((moment) => this._check$(moment)
+          .pipe(
+            // The launch's check is through however it ends: the splash need not wait longer
+            finalize(() => {
+              if (moment === 'launch') {
+                this._launchChecked$.next();
+              }
+            }),
+          )),
       );
   }
 
-  private _check$(): Observable<unknown> {
+  private _check$(moment: CheckMoment): Observable<unknown> {
     return forkJoin([this._manifest$(), from(CapacitorUpdater.current())])
       .pipe(
-        switchMap(([response, current]) => this._apply$(response, current.bundle)),
+        switchMap(([response, current]) => this._apply$(response, current.bundle, moment)),
         // Offline or a refused download: nothing changes, the next check tries again
         catchError(() => EMPTY),
       );
@@ -175,7 +220,7 @@ export class FsCapacitorUpdate {
     }));
   }
 
-  private _apply$(response: HttpResponse, current: BundleInfo): Observable<unknown> {
+  private _apply$(response: HttpResponse, current: BundleInfo, moment: CheckMoment): Observable<unknown> {
     // S3 answers 403 for a manifest that is not there: nothing is published
     if (response.status === 403 || response.status === 404) {
       return this._toBuiltin$(current);
@@ -200,10 +245,10 @@ export class FsCapacitorUpdate {
       this.state.set('idle');
     }
 
-    return this._applyBundle$(manifest.bundle, current);
+    return this._applyBundle$(manifest.bundle, current, moment);
   }
 
-  private _applyBundle$(bundle: CapacitorUpdateBundle | null, current: BundleInfo): Observable<unknown> {
+  private _applyBundle$(bundle: CapacitorUpdateBundle | null, current: BundleInfo, moment: CheckMoment): Observable<unknown> {
     const builtin: Builtin | null = JSON.parse(localStorage.getItem(BUILTIN_KEY));
     if (!builtin || !bundle || !(Date.parse(bundle.build) > (Date.parse(builtin.build) || 0))) {
       return this._toBuiltin$(current);
@@ -222,26 +267,19 @@ export class FsCapacitorUpdate {
       return EMPTY;
     }
 
-    return this._install$(bundle, version);
+    return this._install$(bundle, version, moment);
   }
 
-  private _install$(bundle: CapacitorUpdateBundle, version: string): Observable<unknown> {
-    if (bundle.required) {
-      this.progress.set(0);
-      this.state.set('updating');
-    }
-
-    return this._download$(bundle, version)
+  // One already on the phone goes in at a launch or a return from away; a fresh download
+  // only while the launch's splash is still up. A required one goes in either way
+  private _install$(bundle: CapacitorUpdateBundle, version: string, moment: CheckMoment): Observable<unknown> {
+    return this._downloaded$(version)
       .pipe(
-        switchMap((info) => bundle.required
-          ? from(CapacitorUpdater.set(info))
-          : from(CapacitorUpdater.next(info))
+        switchMap((info) => info
+          ? this._place$(bundle, info, moment === 'away' || this._launching)
+          : this._download$(bundle, version)
             .pipe(
-              tap(() => {
-                this._readyId.set(info.id);
-                this.readyVersion.set(bundle.version);
-                this.state.set('ready');
-              }),
+              switchMap((downloaded) => this._place$(bundle, downloaded, this._launching)),
             )),
         // A required download that fails lets the person back in
         catchError(() => {
@@ -252,27 +290,69 @@ export class FsCapacitorUpdate {
       );
   }
 
-  // One already downloaded is reused rather than fetched again
-  private _download$(bundle: CapacitorUpdateBundle, version: string): Observable<BundleInfo> {
+  // In now, or waiting for the next unseen moment with its dialog offering it meanwhile
+  private _place$(bundle: CapacitorUpdateBundle, info: BundleInfo, swap: boolean): Observable<unknown> {
+    if (bundle.required || swap) {
+      return this._set$(info);
+    }
+
+    this._readyId.set(info.id);
+    this.readyVersion.set(bundle.version);
+    this.state.set('ready');
+
+    return EMPTY;
+  }
+
+  private _downloaded$(version: string): Observable<BundleInfo | undefined> {
     return from(CapacitorUpdater.list())
       .pipe(
         map(({ bundles }) => bundles
           .find((info) => info.version === version && (info.status === 'success' || info.status === 'pending'))),
-        switchMap((info) => info ? of(info) : from(CapacitorUpdater.download({
-          url: bundle.url,
-          version,
-          checksum: bundle.checksum,
-          sessionKey: bundle.sessionKey,
-        }))),
       );
   }
 
-  // Back to the store build at the next background, never under the person
+  private _download$(bundle: CapacitorUpdateBundle, version: string): Observable<BundleInfo> {
+    // Only a required version, which the person must wait for, shows its download
+    if (bundle.required) {
+      this.progress.set(0);
+      this.state.set('updating');
+    }
+
+    return from(CapacitorUpdater.download({
+      url: bundle.url,
+      version,
+      checksum: bundle.checksum,
+      sessionKey: bundle.sessionKey,
+    }));
+  }
+
+  // The plugin reloads the web view into the bundle. Past the launch the splash comes
+  // back up first, so the reload reads as a launch; the new bundle's launch takes it down
+  private _set$(bundle: BundleId): Observable<unknown> {
+    const splash = !this._launching && Capacitor.isPluginAvailable('SplashScreen');
+    const splash$: Observable<unknown> = splash ? from(SplashScreen.show({ autoHide: false })) : of(null);
+
+    return splash$
+      .pipe(
+        switchMap(() => from(CapacitorUpdater.set(bundle))),
+        // The reload refused: the splash comes down over the version still running
+        catchError(() => splash ? from(SplashScreen.hide()) : EMPTY),
+      );
+  }
+
+  // Back to the store build: behind the launch's splash, else at the next background
   private _toBuiltin$(current: BundleInfo): Observable<unknown> {
-    const queued = this.state() === 'ready';
+    this._readyId.set(null);
+    this.readyVersion.set(null);
     this.state.set('idle');
 
-    return current.id === BUILTIN_ID && !queued ? EMPTY : from(CapacitorUpdater.next({ id: BUILTIN_ID }));
+    if (current.id === BUILTIN_ID) {
+      return EMPTY;
+    }
+
+    return this._launching
+      ? from(CapacitorUpdater.set({ id: BUILTIN_ID }))
+      : from(CapacitorUpdater.next({ id: BUILTIN_ID }));
   }
 
   private _recordBuiltin$(): Observable<unknown> {
@@ -292,12 +372,16 @@ export class FsCapacitorUpdate {
       );
   }
 
-  private _resume$(): Observable<void> {
-    return new Observable<void>((subscriber) => {
-      const handle = App.addListener('resume', () => subscriber.next());
+  // Each return to the app, with how long it was away
+  private _resume$(): Observable<number> {
+    return new Observable<number>((subscriber) => {
+      let pausedAt = Date.now();
+      const pause = App.addListener('pause', () => pausedAt = Date.now());
+      const resume = App.addListener('resume', () => subscriber.next(Date.now() - pausedAt));
 
       return () => {
-        handle.then((listener) => listener.remove());
+        pause.then((listener) => listener.remove());
+        resume.then((listener) => listener.remove());
       };
     });
   }

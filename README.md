@@ -37,9 +37,13 @@ initCapacitor();
 
 The app reads `{manifestUrl}{bundleId}/manifest.json` (published by Environment Manager or
 Deployment Manager) on launch and on resume. Capgo's plugin downloads, verifies and swaps
-the bundle. A new version applies at the next background, or now from its dialog's Restart
-(Later closes the dialog until a newer version); a required one applies at once. The dialog
-is an `fs-dialog`, so it takes the app's own theme. Off on the web and while `manifestUrl` is empty.
+the bundle. A new version downloads in the background and goes in only behind the splash,
+where the reload goes unseen: at a launch, which holds the splash up to 3 seconds for the
+download, or on a return after 10 minutes or more away. A quick switch to another app never
+reloads it. Meanwhile its dialog's Restart puts it in now (Later closes the dialog until a
+newer version). A required one goes in as soon as it is on the phone; its full screen shows
+only while a download outlasts the launch's splash or starts after it. The dialog is an
+`fs-dialog`, so it takes the app's own theme. Off on the web and while `manifestUrl` is empty.
 "Update required" sends the phone to the manifest's `storeUrl` for its platform (Deployment
 Manager's builds: the app in TestFlight, by its Apple ID), else to the store listing Capgo's
 plugin finds by the bundle ID.
@@ -70,7 +74,9 @@ import { FsCapacitorConfigService } from '@firestitch/capacitor/config';
 export default FsCapacitorConfigService.init(config, environment.capacitor);
 ```
    `init()` adds the `CapacitorUpdater` block: manual mode, no Capgo stats, and the public key,
-   which the plugin only reads natively.
+   which the plugin only reads natively. It also sets `SplashScreen.launchAutoHide: false`:
+   `FsCapacitorModule` takes the splash down once the launch's update check is through, so
+   the app must not call `SplashScreen.hide()` itself.
 
 4. Once, in the root component's template: `<fs-capacitor-update></fs-capacitor-update>`.
    Its full screen takes the app's colors and icon from the same `update` block; a color
