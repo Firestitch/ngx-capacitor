@@ -2,8 +2,10 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 
 import { CapacitorUpdateConfig } from '@firestitch/capacitor/config';
 
-import { EMPTY, Observable, ReplaySubject, Subject, forkJoin, from, merge, of, race, timer } from 'rxjs';
-import { catchError, defaultIfEmpty, exhaustMap, filter, finalize, map, share, switchMap, take, tap } from 'rxjs/operators';
+import { EMPTY, Observable, ReplaySubject, Subject, forkJoin, from, fromEvent, merge, of, race, throwError, timer } from 'rxjs';
+import {
+  catchError, defaultIfEmpty, exhaustMap, filter, finalize, map, share, startWith, switchMap, take, tap,
+} from 'rxjs/operators';
 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { App } from '@capacitor/app';
@@ -15,6 +17,7 @@ import { BundleId, BundleInfo, CapacitorUpdater } from '@capgo/capacitor-updater
 import {
   CAPACITOR_UPDATE_AWAY_SWAP,
   CAPACITOR_UPDATE_CHECK_EVERY,
+  CAPACITOR_UPDATE_DOWNLOAD_STALL,
   CAPACITOR_UPDATE_LAUNCH_WAIT,
 } from '../consts/capacitor-update-timing';
 import { capacitorUpdateBundleName, capacitorUpdateVersion } from '../helpers/capacitor-update-bundle-name';
@@ -58,6 +61,8 @@ const MANIFEST_TIMEOUT = 10000;
  *   closes the dialog until a newer one.
  * - A required version goes in as soon as it is on the phone. Only a download that outlasts
  *   the launch's splash, or starts after it, shows the full screen.
+ * - A download fails once the phone goes offline or it makes no progress for DOWNLOAD_STALL:
+ *   the full screen closes on the version running, and the next check tries again.
  * - The store build is the floor: a bundle no newer than it, nothing published, or
  *   updates stopped all go back to it. So a newer store build always wins, and pointing
  *   the manifest at an older bundle rolls phones back.
@@ -105,6 +110,8 @@ export class FsCapacitorUpdate {
   private _launching = true;
   private _launchChecked$ = new ReplaySubject<void>(1);
   private _checkEnded$ = new Subject<void>();
+  // Each step of a download, which keeps it from counting as stalled
+  private _downloadProgress$ = new Subject<void>();
   // In front the timer runs; in the background it waits for the return
   private _front = true;
   // The waiting version's name, for the history
@@ -240,7 +247,10 @@ export class FsCapacitorUpdate {
   }
 
   private _start$(): Observable<unknown> {
-    CapacitorUpdater.addListener('download', (event) => this.progress.set(Math.round(event.percent)));
+    CapacitorUpdater.addListener('download', (event) => {
+      this.progress.set(Math.round(event.percent));
+      this._downloadProgress$.next();
+    });
 
     return forkJoin([from(CapacitorUpdater.current()), from(CapacitorUpdater.getFailedUpdate())])
       .pipe(
@@ -433,12 +443,36 @@ export class FsCapacitorUpdate {
       this.state.set('updating');
     }
 
-    return from(CapacitorUpdater.download({
-      url: bundle.url,
-      version,
-      checksum: bundle.checksum,
-      sessionKey: bundle.sessionKey,
-    }));
+    return race(
+      from(CapacitorUpdater.download({
+        url: bundle.url,
+        version,
+        checksum: bundle.checksum,
+        sessionKey: bundle.sessionKey,
+      })),
+      this._downloadLost$(),
+    );
+  }
+
+  // The plugin never fails a download whose connection drops: it waits for the network to
+  // come back (Android's WorkManager retries it then), and a required one's full screen
+  // waits with it. So the download fails here instead. The plugin may still finish it in
+  // the background, and the next check then finds it on the phone
+  private _downloadLost$(): Observable<never> {
+    return merge(
+      fromEvent(window, 'offline')
+        .pipe(map(() => 'the connection was lost')),
+      this._downloadProgress$
+        .pipe(
+          startWith(null),
+          switchMap(() => timer(CAPACITOR_UPDATE_DOWNLOAD_STALL)),
+          map(() => `it made no progress for ${CAPACITOR_UPDATE_DOWNLOAD_STALL / 1000} seconds`),
+        ),
+    )
+      .pipe(
+        take(1),
+        switchMap((reason: string) => throwError(() => new Error(reason))),
+      );
   }
 
   // The plugin reloads the web view into the bundle. Past the launch the splash comes

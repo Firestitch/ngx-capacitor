@@ -44,7 +44,9 @@ download, or on a return after 10 minutes or more away. A quick switch to anothe
 reloads it. Meanwhile its dialog's Restart puts it in now (Later closes the dialog until a
 newer version). One left waiting goes in at the next launch before the manifest is read, so a
 slow network cannot keep it out. A required one goes in as soon as it is on the phone; its full screen shows
-only while a download outlasts the launch's splash or starts after it. The dialog is an
+only while a download outlasts the launch's splash or starts after it. A download fails once the
+phone goes offline or it makes no progress for 30 seconds: the full screen closes, the app carries
+on with the version it runs, and the next check tries again. The dialog is an
 `fs-dialog`, so it takes the app's own theme. Off on the web and while `manifestUrl` is empty.
 "Update required" sends the phone to the manifest's `storeUrl` for its platform (Deployment
 Manager's builds: the app in TestFlight, by its Apple ID), else to the store listing Capgo's
