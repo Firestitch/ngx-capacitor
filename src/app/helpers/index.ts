@@ -1,4 +1,5 @@
 export * from './capacitor-update-bundle-name';
+export * from './capacitor-update-checksum';
 export * from './cordova';
 export * from './cordova-supported';
 export * from './formdata-to-mutipart-array';

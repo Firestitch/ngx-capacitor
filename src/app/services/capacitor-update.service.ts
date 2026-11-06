@@ -21,6 +21,7 @@ import {
   CAPACITOR_UPDATE_LAUNCH_WAIT,
 } from '../consts/capacitor-update-timing';
 import { capacitorUpdateBundleName, capacitorUpdateVersion } from '../helpers/capacitor-update-bundle-name';
+import { capacitorUpdateChecksum } from '../helpers/capacitor-update-checksum';
 import {
   CapacitorUpdateAppData,
   CapacitorUpdateBuiltin,
@@ -237,6 +238,30 @@ export class FsCapacitorUpdate {
     }));
   }
 
+  /**
+   * A published bundle's checksum as the managers list it, the SHA-256 of its zip: the
+   * manifest sends it encrypted, and the app's public key reads it back. The value as
+   * published when the key cannot
+   */
+  public checksum(bundle: CapacitorUpdateBundle): string {
+    return capacitorUpdateChecksum(bundle.checksum, this.config().publicKey) ?? bundle.checksum;
+  }
+
+  /** The plugin's version string for a published bundle, "4.0.2+3b90b85e702e" */
+  public bundleVersion(bundle: CapacitorUpdateBundle): string {
+    return capacitorUpdateVersion(bundle, this.checksum(bundle));
+  }
+
+  /**
+   * Whether a bundle the plugin has is the published one: by its version string, or by the
+   * checksum the plugin verified its zip with. The checksum also matches a bundle an
+   * earlier updater named by the start of the encrypted checksum
+   */
+  public isPublished(info: BundleInfo | null | undefined, bundle: CapacitorUpdateBundle): boolean {
+    return !!info
+      && (info.version === this.bundleVersion(bundle) || (!!info.checksum && info.checksum === this.checksum(bundle)));
+  }
+
   private _launch$(): Observable<void> {
     return race(this._launchChecked$, timer(CAPACITOR_UPDATE_LAUNCH_WAIT))
       .pipe(
@@ -358,8 +383,8 @@ export class FsCapacitorUpdate {
       return EMPTY;
     }
 
-    const version = capacitorUpdateVersion(bundle);
-    if (current.version === version) {
+    const version = this.bundleVersion(bundle);
+    if (this.isPublished(current, bundle)) {
       // The published version is the one running: one left waiting was withdrawn
       this._clearWaiting();
       if (this.state() === 'ready') {
@@ -383,7 +408,7 @@ export class FsCapacitorUpdate {
   // One already on the phone goes in at a launch or a return from away; a fresh download
   // only while the launch's splash is still up. A required one goes in either way
   private _install$(bundle: CapacitorUpdateBundle, version: string, moment: CapacitorUpdateMoment): Observable<unknown> {
-    return this._downloaded$(version)
+    return this._downloaded$(bundle)
       .pipe(
         switchMap((info) => info
           ? this._place$(bundle, info, moment === 'away' || this._launching)
@@ -428,11 +453,11 @@ export class FsCapacitorUpdate {
     return EMPTY;
   }
 
-  private _downloaded$(version: string): Observable<BundleInfo | undefined> {
+  private _downloaded$(bundle: CapacitorUpdateBundle): Observable<BundleInfo | undefined> {
     return from(CapacitorUpdater.list())
       .pipe(
         map(({ bundles }) => bundles
-          .find((info) => info.version === version && (info.status === 'success' || info.status === 'pending'))),
+          .find((info) => this.isPublished(info, bundle) && (info.status === 'success' || info.status === 'pending'))),
       );
   }
 
@@ -665,7 +690,7 @@ export class FsCapacitorUpdate {
 
   // A published bundle as the managers list it: "4.0.2 (checksum 3fa9c1e0b2d4)"
   private _name(bundle: CapacitorUpdateBundle): string {
-    return capacitorUpdateBundleName(capacitorUpdateVersion(bundle));
+    return capacitorUpdateBundleName(this.bundleVersion(bundle));
   }
 
   private _result(result: string): void {

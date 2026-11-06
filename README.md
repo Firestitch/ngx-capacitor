@@ -78,7 +78,8 @@ import { FsCapacitorConfigService } from '@firestitch/capacitor/config';
 export default FsCapacitorConfigService.init(config, environment.capacitor);
 ```
    `init()` adds the `CapacitorUpdater` block: manual mode, no Capgo stats, and the public key,
-   which the plugin only reads natively. It also sets `SplashScreen.launchAutoHide: false`:
+   which the plugin reads natively. The app reads the same key to turn the manifest's encrypted
+   checksum back into the SHA-256 the managers list, so App info and the history match them. It also sets `SplashScreen.launchAutoHide: false`:
    `FsCapacitorModule` takes the splash down once the launch's update check is through, so
    the app must not call `SplashScreen.hide()` itself.
 

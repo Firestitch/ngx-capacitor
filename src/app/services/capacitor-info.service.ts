@@ -9,11 +9,12 @@ import { Device, DeviceId, DeviceInfo, GetLanguageCodeResult } from '@capacitor/
 import { BundleInfo, BundleListResult, BundleStatus, CapacitorUpdater, PluginVersion } from '@capgo/capacitor-updater';
 
 import { CAPACITOR_UPDATE_AWAY_SWAP, CAPACITOR_UPDATE_CHECK_EVERY } from '../consts/capacitor-update-timing';
-import { capacitorUpdateBundleName, capacitorUpdateVersion } from '../helpers/capacitor-update-bundle-name';
+import { capacitorUpdateBundleName } from '../helpers/capacitor-update-bundle-name';
 import {
   CapacitorInfoRow,
   CapacitorInfoSection,
   CapacitorUpdateBuiltin,
+  CapacitorUpdateBundle,
   CapacitorUpdateEvent,
   CapacitorUpdateManifest,
   CapacitorUpdateMoment,
@@ -128,7 +129,7 @@ export class FsCapacitorInfo {
       this._appSection(this._builtin(read.updater, read.build, read.native)),
       this._codeSection(read.build, read.native, read.updater),
       this._updatesSection(read.updater),
-      this._bundlesSection(read.updater, published ? capacitorUpdateVersion(published) : null),
+      this._bundlesSection(read.updater, published),
       this._historySection(),
       this._publishedSection(read.manifest, read.updater),
       this._deviceSection(read.device, read.deviceId?.identifier, read.language?.value),
@@ -191,7 +192,7 @@ export class FsCapacitorInfo {
   }
 
   /** The updates the plugin downloaded and keeps on this phone, one row each */
-  private _bundlesSection(updater: UpdaterRead | null, published: string | null): CapacitorInfoSection {
+  private _bundlesSection(updater: UpdaterRead | null, published: CapacitorUpdateBundle | null | undefined): CapacitorInfoSection {
     if (!updater?.bundles) {
       return this._section('On this phone', []);
     }
@@ -250,12 +251,12 @@ export class FsCapacitorInfo {
   private _manifestRows(manifest: CapacitorUpdateManifest, updater: UpdaterRead | null): CapacitorInfoRow[] {
     const bundle = manifest.bundle;
     const platform = this._update.platform as 'ios' | 'android';
-    const version = bundle ? capacitorUpdateVersion(bundle) : null;
 
     return [
       this._row('Version', bundle ? bundle.version : 'None: updates are stopped'),
-      this._row('Checksum', bundle?.checksum),
-      this._row('This phone', version ? this._publishedHere(version, updater) : null),
+      // As the managers list it, not the encrypted value the manifest carries for the plugin
+      this._row('Checksum', bundle ? this._update.checksum(bundle) : null),
+      this._row('This phone', bundle ? this._publishedHere(bundle, updater) : null),
       this._row('Built', this._dateTime(bundle?.build)),
       this._row('Native level', bundle?.nativeLevel),
       this._row('Required', bundle ? this._yesNo(bundle.required) : null),
@@ -332,34 +333,34 @@ export class FsCapacitorInfo {
   }
 
   /** One downloaded bundle: its checksum, how it went, and where it stands */
-  private _bundleFacts(bundle: BundleInfo, updater: UpdaterRead, published: string | null): string {
+  private _bundleFacts(bundle: BundleInfo, updater: UpdaterRead, published: CapacitorUpdateBundle | null | undefined): string {
     return [
       `Checksum ${this._checksum(bundle)}`,
       BUNDLE_STATUS_NAMES[bundle.status] || bundle.status,
       bundle.downloaded ? `downloaded ${this._dateTime(bundle.downloaded)}` : null,
       bundle.id === updater.current?.bundle?.id ? 'running now' : null,
       bundle.id === updater.next?.id && bundle.id !== updater.current?.bundle?.id ? 'set for the next launch' : null,
-      bundle.version === published ? 'the published update' : null,
+      published && this._update.isPublished(bundle, published) ? 'the published update' : null,
     ]
       .filter((fact: string | null) => !!fact)
       .join(', ');
   }
 
   /** Where the published bundle stands on this phone */
-  private _publishedHere(version: string, updater: UpdaterRead | null): string | null {
+  private _publishedHere(published: CapacitorUpdateBundle, updater: UpdaterRead | null): string | null {
     if (!updater) {
       return null;
     }
 
-    if (updater.current?.bundle?.version === version) {
+    if (this._update.isPublished(updater.current?.bundle, published)) {
       return 'Running it';
     }
 
-    if (this._update.failedVersion === version) {
+    if (this._update.failedVersion === this._update.bundleVersion(published)) {
       return 'It failed to start here, so it is skipped';
     }
 
-    return (updater.bundles || []).some((bundle: BundleInfo) => bundle.version === version)
+    return (updater.bundles || []).some((bundle: BundleInfo) => this._update.isPublished(bundle, published))
       ? 'Downloaded, not running yet'
       : 'Not downloaded';
   }

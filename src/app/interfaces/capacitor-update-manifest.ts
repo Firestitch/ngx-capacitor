@@ -18,6 +18,7 @@ export interface CapacitorUpdateBundle {
   /** The bundle's own assets/build.json date */
   build: string;
   url: string;
+  /** The SHA-256 of the zip, encrypted with the app's private key for the plugin; capacitorUpdateChecksum() reads it back */
   checksum: string;
   sessionKey: string;
   /** The bundle's own assets/native.json level */
