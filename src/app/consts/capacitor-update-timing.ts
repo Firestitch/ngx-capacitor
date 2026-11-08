@@ -7,5 +7,12 @@ export const CAPACITOR_UPDATE_AWAY_SWAP = 10 * 60 * 1000;
 /** While the app stays in front, it checks again this long after the last check ended */
 export const CAPACITOR_UPDATE_CHECK_EVERY = 15 * 60 * 1000;
 
+/**
+ * A manifest read still out after this long confirms the bundle anyway: its updater ran as far
+ * as asking, and a slow network must not outlast the plugin's 10 second wait (counted from the
+ * native launch, before Angular starts) and get a good bundle put back
+ */
+export const CAPACITOR_UPDATE_CONFIRM_WAIT = 3000;
+
 /** A download with no progress for this long has stalled, and fails */
 export const CAPACITOR_UPDATE_DOWNLOAD_STALL = 30 * 1000;

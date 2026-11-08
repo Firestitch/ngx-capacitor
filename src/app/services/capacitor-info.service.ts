@@ -89,9 +89,10 @@ interface InfoRead {
 
 /**
  * Everything the app can say about itself for the App info dialog
- * (FsCapacitorInfoComponent): the store build, the web code running in it, the
- * over-the-air updater with its checks and history, the bundles on the phone, the
- * manifest as it is published now, and the device.
+ * (FsCapacitorInfoComponent): first the code running now (the store build's own or a
+ * downloaded update, by the checksum the managers list), then the over-the-air updater
+ * with its checks, the update published now, the updates on the phone, the store build,
+ * the history and the device.
  *
  * READ ONCE ON EACH OPEN, DRAWN EVERY SECOND. The phone and the server are read when the
  * dialog opens, each read on its own: a call this phone cannot answer leaves out its own
@@ -125,23 +126,52 @@ export class FsCapacitorInfo {
   private _sections(read: InfoRead): CapacitorInfoSection[] {
     const published = read.manifest?.manifest?.bundle;
 
+    // What runs leads; where it came from and what comes next follow; the phone itself last
     return [
-      this._appSection(this._builtin(read.updater, read.build, read.native)),
-      this._codeSection(read.build, read.native, read.updater),
+      this._runningSection(read.build, read.native, read.updater),
       this._updatesSection(read.updater),
-      this._bundlesSection(read.updater, published),
-      this._historySection(),
       this._publishedSection(read.manifest, read.updater),
+      this._bundlesSection(read.updater, published),
+      this._storeSection(this._builtin(read.updater, read.build, read.native)),
+      this._historySection(),
       this._deviceSection(read.device, read.deviceId?.identifier, read.language?.value),
     ]
       .filter((section: CapacitorInfoSection) => section.rows.length > 0);
   }
 
-  /** The store build: what the App Store or Google Play installed */
-  private _appSection(builtin: CapacitorUpdateBuiltin | null): CapacitorInfoSection {
+  /**
+   * The code in the web view now, the one answer people open the dialog for: the store
+   * build's own, or a downloaded update named the way the managers list it, so it can be
+   * found in their Bundles list
+   */
+  private _runningSection(build: AssetFile, native: AssetFile, updater: UpdaterRead): CapacitorInfoSection {
+    const bundle = this._downloaded(updater?.current?.bundle);
+    const app = this._update.appData;
+    const version = build?.version || bundle?.version.split('+')[0];
+
+    return {
+      ...this._section('Running now', [
+        this._row('Version', version),
+        this._row('Checksum', null, bundle ? this._checksum(bundle) : null),
+        this._row('Built', this._dateTime(build?.date)),
+        this._row('Downloaded', this._dateTime(bundle?.downloaded)),
+        this._row('Native level', native?.level),
+        this._row('Next launch', this._nextLaunch(updater)),
+        this._row('Production build', this._yesNo(!isDevMode())),
+        this._row('Angular', VERSION.full),
+      ]),
+      title: bundle ? `Update ${version}` : 'Store build',
+      note: bundle
+        ? 'Downloaded over the air. It is the bundle with this checksum in the app\'s Bundles list in Deployment Manager or Environment Manager.'
+        : `The code ${this._storeName()} installed with version ${app.version} (${app.buildNumber}). No downloaded update is running.`,
+    };
+  }
+
+  /** The store build: what the App Store or Google Play installed, whatever code runs in it now */
+  private _storeSection(builtin: CapacitorUpdateBuiltin | null): CapacitorInfoSection {
     const app = this._update.appData;
 
-    return this._section('App', [
+    return this._section('Store build', [
       this._row('Name', app.name),
       this._row('Bundle ID', app.bundleIdentifier),
       this._row('Platform', this._systemName(app.platform)),
@@ -149,22 +179,6 @@ export class FsCapacitorInfo {
       this._row('Build', app.buildNumber),
       this._row('Built', this._dateTime(builtin?.build)),
       this._row('Native level', builtin?.nativeLevel),
-    ]);
-  }
-
-  /** The web code in the web view now: the store build's own, or a downloaded update */
-  private _codeSection(build: AssetFile, native: AssetFile, updater: UpdaterRead): CapacitorInfoSection {
-    const bundle = this._downloaded(updater?.current?.bundle);
-
-    return this._section('Running code', [
-      this._row('Source', bundle ? 'Downloaded update' : 'Store build'),
-      this._row('Version', build?.version),
-      this._row('Checksum', bundle ? this._checksum(bundle) : null),
-      this._row('Built', this._dateTime(build?.date)),
-      this._row('Downloaded', this._dateTime(bundle?.downloaded)),
-      this._row('Native level', native?.level),
-      this._row('Production build', this._yesNo(!isDevMode())),
-      this._row('Angular', VERSION.full),
     ]);
   }
 
@@ -184,7 +198,6 @@ export class FsCapacitorInfo {
       this._row('Status', enabled ? this._status() : null),
       this._row('Goes in', this._update.state() === 'ready' ? this._goesIn() : null),
       this._row('Last install', applied ? `${this._dateTime(applied.date)} (${this._ago(applied.date)}), ${applied.message}` : null),
-      this._row('Next launch', this._nextLaunch(updater)),
       this._row('Last failed', this._update.failedVersion ? capacitorUpdateBundleName(this._update.failedVersion) : null),
       this._row('Manifest', this._update.manifestUrl),
       this._row('Updater plugin', updater?.pluginVersion),
@@ -202,14 +215,14 @@ export class FsCapacitorInfo {
       ? bundles.map((bundle: BundleInfo) => this._row(
         bundle.version.split('+')[0],
         this._bundleFacts(bundle, updater, published),
+        this._checksum(bundle),
       ))
       : [this._row('Downloaded updates', 'None, so the store build\'s own code runs')];
 
     return {
-      ...this._section('On this phone', rows),
+      ...this._section('Downloaded updates', rows),
       note: bundles.length
-        ? 'Each update by its version and checksum, the SHA-256 of its zip. Environment Manager and '
-          + 'Deployment Manager list the start of the checksum; hover there for all of it'
+        ? 'Each update by its version and checksum, as the managers\' Bundles list shows them. Tap a checksum for all of it.'
         : null,
     };
   }
@@ -255,7 +268,7 @@ export class FsCapacitorInfo {
     return [
       this._row('Version', bundle ? bundle.version : 'None: updates are stopped'),
       // As the managers list it, not the encrypted value the manifest carries for the plugin
-      this._row('Checksum', bundle ? this._update.checksum(bundle) : null),
+      this._row('Checksum', null, bundle ? this._update.checksum(bundle) : null),
       this._row('This phone', bundle ? this._publishedHere(bundle, updater) : null),
       this._row('Built', this._dateTime(bundle?.build)),
       this._row('Native level', bundle?.nativeLevel),
@@ -332,18 +345,24 @@ export class FsCapacitorInfo {
     return next.id === BUILTIN_ID ? 'Store build' : capacitorUpdateBundleName(next.version);
   }
 
-  /** One downloaded bundle: its checksum, how it went, and where it stands */
+  /** One downloaded bundle: where it stands first, then how it went and when it came */
   private _bundleFacts(bundle: BundleInfo, updater: UpdaterRead, published: CapacitorUpdateBundle | null | undefined): string {
-    return [
-      `Checksum ${this._checksum(bundle)}`,
-      BUNDLE_STATUS_NAMES[bundle.status] || bundle.status,
-      bundle.downloaded ? `downloaded ${this._dateTime(bundle.downloaded)}` : null,
+    const facts = [
       bundle.id === updater.current?.bundle?.id ? 'running now' : null,
       bundle.id === updater.next?.id && bundle.id !== updater.current?.bundle?.id ? 'set for the next launch' : null,
       published && this._update.isPublished(bundle, published) ? 'the published update' : null,
+      BUNDLE_STATUS_NAMES[bundle.status] || bundle.status,
+      bundle.downloaded ? `downloaded ${this._dateTime(bundle.downloaded)}` : null,
     ]
       .filter((fact: string | null) => !!fact)
       .join(', ');
+
+    return facts.charAt(0).toUpperCase() + facts.slice(1);
+  }
+
+  /** Where this platform's store build comes from, in a sentence */
+  private _storeName(): string {
+    return this._update.platform === 'android' ? 'Google Play' : 'the App Store';
   }
 
   /** Where the published bundle stands on this phone */
@@ -448,12 +467,19 @@ export class FsCapacitorInfo {
     };
   }
 
-  private _row(label: string, value: string | number | null | undefined): CapacitorInfoRow | null {
-    if (value === null || value === undefined || value === '') {
+  /** A fact, its checksum, or both; null, and left out, when this phone has neither */
+  private _row(label: string, value: string | number | null | undefined, checksum?: string | null): CapacitorInfoRow | null {
+    const text = value === null || value === undefined ? '' : String(value);
+
+    if (!text && !checksum) {
       return null;
     }
 
-    return { label, value: String(value) };
+    return {
+      label,
+      ...(text ? { value: text } : {}),
+      ...(checksum ? { checksum } : {}),
+    };
   }
 
   private _dateTime(value: string | null | undefined): string | null {

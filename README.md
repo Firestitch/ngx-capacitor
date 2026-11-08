@@ -98,9 +98,12 @@ update: {
    viewport needs `viewport-fit=cover`. On Android the status bar takes the background color
    while the screen shows.
 
-5. `src/assets/native.json`: `{"level": 1}`. Bump it only when a native plugin or permission
-   changes. A bundle whose level is above the store build's is never installed on it, and
-   Environment/Deployment Manager refuse a zip without this file.
+5. `src/assets/native.json`: `{"level": 1}`. Raise it with `npx native-level` whenever a native
+   plugin, or a permission the new web code relies on, changes. A bundle whose level is above
+   the store build's is never installed on it, and Environment/Deployment Manager refuse a zip
+   without this file. `npx build` and `npx package` (`@firestitch/app-tools`) record the app's
+   native plugins in it and fail when they change without a raise, so a forgotten plugin
+   never reaches an old store build. A permission has no such check: raise it by hand.
 
 6. Optional: `<fs-capacitor-version></fs-capacitor-version>` wherever the app shows its version.
    It prints "App version 3.0.3 (42)" as plain text for the app to style, and hides itself on
@@ -111,3 +114,47 @@ update: {
    with Copy details. The updater keeps its last check (`lastCheck`) and its history (`events`,
    newest 20) in local storage, so both survive a reload into a new bundle; `nextCheck` is the
    timer's next check while the app is in front.
+
+7. Optional: report each phone's install to the app's backend. `FsCapacitorUpdate.install` (and
+   `install$`) holds a `CapacitorAppInstall`: the device identifier, bundle id, platform, model
+   and OS, the store build (version, build number, build date, native level) and the code
+   running in it (`codeSource` store or update, its version, checksum and build date), plus the
+   last check's result. It is read once the launch's check ends, again whenever a later check
+   changes it, and once at the start while updates are off. Each phone read is caught on its
+   own, so a value the phone cannot give is null and nothing throws. Post it while someone is
+   signed in, quietly, and drop any failure: the next launch sends it again.
+```ts
+combineLatest([accountId$, this._update.install$])
+  .pipe(
+    filter(([accountId, install]) => !!accountId && !!install),
+    switchMap(([, install]) => this._data.post(install, quiet).pipe(catchError(() => EMPTY))),
+  )
+  .subscribe();
+```
+
+# Running updates
+
+What to do in Deployment Manager (or Environment Manager) for each situation. Phones only ever
+take the **live** bundle, and only when it was built after their store build.
+
+| Situation | Do this | What phones do |
+|---|---|---|
+| Ship web changes | Upload the zip `npx package` makes, with Make live on | Download it in the background; it goes in at the next launch, or after 10+ minutes away |
+| Must reach everyone now (it goes with a server change old code can't handle) | Upload it with Required on | Install it as soon as it is downloaded, behind a full screen if the person is using the app |
+| A bundle is broken | Make live on the bundle before it | Go back to it at their next check |
+| Everything is broken | Stop updates | Go back to their store build at their next check |
+| A bundle breaks the updater itself | Nothing: the phone never confirms it, so about 10 seconds into its first launch the code before it goes back, and that bundle is skipped for good | Run the code before it |
+| New native code (a plugin or a permission) | `npx native-level`, then ship a store build | Phones on older store builds skip bundles built after it until they update from the store |
+| Old store builds must update | Set the minimum iOS / Android version on the app | Show "Update required", which opens the store |
+| Upload without sending it | Upload with Make live off | Nothing until you make it live |
+
+Deleting a bundle never changes what phones run: the live bundle cannot be deleted, and a deleted
+one was not being offered. Making an older bundle live reaches only phones whose store build is
+older than it; the rest run their store build.
+
+**Before anything goes live**
+- Build the zip from the code the server runs now, never from an older branch: phones take any
+  live bundle built after their store build, whatever code is in it.
+- The server ships first and only adds. A field or route the app uses is renamed or removed only
+  once no phone still runs code that needs it (raise the minimum store version to force that).
+- A live bundle reaches every phone at once: there is no staged rollout yet.

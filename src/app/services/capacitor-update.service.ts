@@ -2,14 +2,17 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 
 import { CapacitorUpdateConfig } from '@firestitch/capacitor/config';
 
-import { EMPTY, Observable, ReplaySubject, Subject, forkJoin, from, fromEvent, merge, of, race, throwError, timer } from 'rxjs';
+import {
+  EMPTY, Observable, ReplaySubject, Subject, defer, forkJoin, from, fromEvent, merge, of, race, throwError, timer,
+} from 'rxjs';
 import {
   catchError, defaultIfEmpty, exhaustMap, filter, finalize, map, share, startWith, switchMap, take, tap,
 } from 'rxjs/operators';
 
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { App } from '@capacitor/app';
 import { Capacitor, CapacitorHttp, HttpResponse } from '@capacitor/core';
+import { Device } from '@capacitor/device';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { BundleId, BundleInfo, CapacitorUpdater } from '@capgo/capacitor-updater';
 
@@ -17,12 +20,14 @@ import { BundleId, BundleInfo, CapacitorUpdater } from '@capgo/capacitor-updater
 import {
   CAPACITOR_UPDATE_AWAY_SWAP,
   CAPACITOR_UPDATE_CHECK_EVERY,
+  CAPACITOR_UPDATE_CONFIRM_WAIT,
   CAPACITOR_UPDATE_DOWNLOAD_STALL,
   CAPACITOR_UPDATE_LAUNCH_WAIT,
 } from '../consts/capacitor-update-timing';
 import { capacitorUpdateBundleName, capacitorUpdateVersion } from '../helpers/capacitor-update-bundle-name';
 import { capacitorUpdateChecksum } from '../helpers/capacitor-update-checksum';
 import {
+  CapacitorAppInstall,
   CapacitorUpdateAppData,
   CapacitorUpdateBuiltin,
   CapacitorUpdateBundle,
@@ -71,6 +76,14 @@ const MANIFEST_TIMEOUT = 10000;
  *   native level above the store build's (assets/native.json), shows "Update required".
  *   Its Update opens the manifest's storeUrl for the platform, else the store listing.
  * - A bundle needing a higher native level, or one that failed to start here, is skipped.
+ * - A bundle's first launch is kept only once its own update check gets through (or finds
+ *   the phone offline, or is still waiting on the network after CONFIRM_WAIT). One that
+ *   breaks the updater never confirms, so the plugin puts the code before it back after its
+ *   10 second wait: no bundle can strand phones beyond the reach of the next one.
+ * - install says which store build and which code this phone runs, for the app to report
+ *   to its backend. It is read once the launch's check ends, again whenever a later check
+ *   changes it, and once at the start while updates are off. Every read on its own: one
+ *   the phone cannot answer leaves its value null, and nothing here ever throws.
  */
 @Injectable({
   providedIn: 'root',
@@ -100,6 +113,14 @@ export class FsCapacitorUpdate {
   /** When the timer checks next (ISO 8601); null while a check runs or the app is in the background */
   public readonly nextCheck = signal<string | null>(null);
 
+  /**
+   * This phone's store build and the code running in it, for the app to report to its
+   * backend; null until read, and on the web. Set again only when a value changes
+   */
+  public readonly install = signal<CapacitorAppInstall | null>(null);
+
+  public readonly install$ = toObservable(this.install);
+
   public appData: CapacitorUpdateAppData = {};
 
   private _destroyRef = inject(DestroyRef);
@@ -117,6 +138,8 @@ export class FsCapacitorUpdate {
   private _front = true;
   // The waiting version's name, for the history
   private _readyName: string | null = null;
+  // The plugin was told this bundle works (notifyAppReady)
+  private _confirmed = false;
 
   public get version(): string {
     return this.appData.version;
@@ -166,13 +189,13 @@ export class FsCapacitorUpdate {
       return of(null);
     }
 
-    if (Capacitor.isPluginAvailable('CapacitorUpdater')) {
-      // First: a bundle that got this far has started, so the plugin keeps it
-      CapacitorUpdater.notifyAppReady();
-    }
-
     const enabled = !!config.manifestUrl && Capacitor.isPluginAvailable('CapacitorUpdater');
     this._enabled = enabled;
+
+    // Updates off: there is no check to prove, so the bundle running is kept as it starts
+    if (!enabled && Capacitor.isPluginAvailable('CapacitorUpdater')) {
+      this._confirm();
+    }
 
     from(App.getInfo())
       .pipe(
@@ -185,11 +208,14 @@ export class FsCapacitorUpdate {
             platform: this.platform,
           };
         }),
+        tap(() => this._watchInstall(enabled)),
         filter(() => enabled),
         switchMap(() => this._start$()),
-        // The plugin could not answer: no updates this session, and the splash need not wait
+        // The plugin could not answer: no updates this session, and the splash need not wait.
+        // No check will run, so install is read now
         catchError(() => {
           this._launchChecked$.next();
+          this._checkEnded$.next();
 
           return EMPTY;
         }),
@@ -282,7 +308,7 @@ export class FsCapacitorUpdate {
         tap(([, failed]) => {
           if (failed?.bundle?.version) {
             localStorage.setItem(FAILED_KEY, failed.bundle.version);
-            this._event('fail', `${capacitorUpdateBundleName(failed.bundle.version)} failed to start, so the phone went back to the code before it`);
+            this._event('fail', `${capacitorUpdateBundleName(failed.bundle.version)} failed to start or to check for updates, so the phone went back to the code before it`);
           }
         }),
         switchMap(([current]) => (current.bundle.id === BUILTIN_ID ? this._recordBuiltin$() : of(null))
@@ -308,12 +334,31 @@ export class FsCapacitorUpdate {
   private _check$(moment: CapacitorUpdateMoment): Observable<unknown> {
     this._checked(moment);
 
+    const slowRead = this._confirmed ? undefined : setTimeout(() => this._confirm(), CAPACITOR_UPDATE_CONFIRM_WAIT);
+
     return forkJoin([this.manifest$(), from(CapacitorUpdater.current())])
       .pipe(
-        switchMap(([response, current]) => this._apply$(response, current.bundle, moment)),
-        // Offline or a refused download: nothing changes, the next check tries again
+        // Runs once the manifest is judged, or the judging faults: past that a slow read cannot confirm
+        finalize(() => clearTimeout(slowRead)),
+        // Offline: nothing changes and the next check tries again. The check proves nothing
+        // either way, so a good bundle is never put back for a dead network
         catchError((error) => {
+          this._confirm();
           this._result(`Could not reach the update server: ${error?.message || 'unknown error'}`);
+
+          return EMPTY;
+        }),
+        switchMap(([response, current]) => {
+          const apply$ = this._apply$(response, current.bundle, moment);
+          // The manifest was read and judged without a fault: this bundle's updater works
+          this._confirm();
+
+          return apply$;
+        }),
+        // A fault while judging the manifest: this bundle's updater is broken, so it is never
+        // confirmed and the plugin puts the code before it back
+        catchError((error) => {
+          this._result(`The update check failed: ${error?.message || 'unknown error'}`);
 
           return EMPTY;
         }),
@@ -607,7 +652,76 @@ export class FsCapacitorUpdate {
   }
 
   private _asset$(path: string): Observable<any> {
-    return from(fetch(path).then((response) => response.ok ? response.json() : null))
+    return defer(() => fetch(path).then((response) => response.ok ? response.json() : null))
+      .pipe(
+        catchError(() => of(null)),
+      );
+  }
+
+  // install, read after each check ends (once at the start while updates are off), and set
+  // only when a value changed: a phone reports itself once a launch and again on a change
+  private _watchInstall(enabled: boolean): void {
+    const read$: Observable<unknown> = enabled ? this._checkEnded$ : of(null);
+
+    read$
+      .pipe(
+        switchMap(() => this._readInstall$()),
+        filter((install) => !!install && JSON.stringify(install) !== JSON.stringify(this.install())),
+        takeUntilDestroyed(this._destroyRef),
+      )
+      .subscribe((install) => this.install.set(install));
+  }
+
+  // Each read on its own, so one this phone cannot answer leaves only its value null. No
+  // device identifier or no phone platform: nothing to name the install by, so nothing
+  private _readInstall$(): Observable<CapacitorAppInstall | null> {
+    const updater = Capacitor.isPluginAvailable('CapacitorUpdater');
+
+    return forkJoin({
+      device: this._native$(() => Device.getInfo()),
+      deviceId: this._native$(() => Device.getId()),
+      current: updater ? this._native$(() => CapacitorUpdater.current()) : of(null),
+      build: this._asset$('assets/build.json'),
+      native: this._asset$('assets/native.json'),
+    })
+      .pipe(
+        map(({ device, deviceId, current, build, native }): CapacitorAppInstall | null => {
+          const platform = this.platform;
+          if (!deviceId?.identifier || !this.bundleIdentifier || (platform !== 'ios' && platform !== 'android')) {
+            return null;
+          }
+
+          // A downloaded bundle runs; the store build's own facts are then the ones it recorded
+          const update = current?.bundle && current.bundle.id !== BUILTIN_ID ? current.bundle : null;
+          const builtin: CapacitorUpdateBuiltin | null = update
+            ? this.builtin
+            : { build: build?.date ?? null, nativeLevel: Number(native?.level) || 0 };
+          const result = this.lastCheck()?.result;
+
+          return {
+            deviceIdentifier: deviceId.identifier,
+            bundleId: this.bundleIdentifier,
+            platform,
+            model: device?.model || null,
+            osVersion: device?.osVersion || null,
+            storeVersion: this.version || null,
+            storeBuild: Number.isFinite(this.buildNumber) ? String(this.buildNumber) : null,
+            storeBuildDate: builtin?.build ?? null,
+            nativeLevel: builtin ? builtin.nativeLevel : null,
+            codeSource: update ? 'update' : 'store',
+            codeVersion: build?.version || update?.version.split('+')[0] || null,
+            codeChecksum: update ? (update.checksum || update.version.split('+')[1] || null) : null,
+            codeBuildDate: build?.date ?? null,
+            lastCheckResult: result && result !== 'Checking' ? result : null,
+          };
+        }),
+        catchError(() => of(null)),
+      );
+  }
+
+  // A native call; null when this phone cannot answer it
+  private _native$<T>(call: () => Promise<T>): Observable<T | null> {
+    return defer(call)
       .pipe(
         catchError(() => of(null)),
       );
@@ -691,6 +805,22 @@ export class FsCapacitorUpdate {
   // A published bundle as the managers list it: "4.0.2 (checksum 3fa9c1e0b2d4)"
   private _name(bundle: CapacitorUpdateBundle): string {
     return capacitorUpdateBundleName(this.bundleVersion(bundle));
+  }
+
+  /**
+   * Tells the plugin the bundle running works, once a session. A bundle's first launch is
+   * kept only once its own update check gets through (or is still waiting on the network
+   * after CONFIRM_WAIT), so one that breaks the updater can never strand phones: unconfirmed,
+   * the plugin puts the code before it back after its 10 second wait and every later check
+   * skips it. The store build needs no confirming; the plugin never puts it back
+   */
+  private _confirm(): void {
+    if (this._confirmed) {
+      return;
+    }
+
+    this._confirmed = true;
+    CapacitorUpdater.notifyAppReady();
   }
 
   private _result(result: string): void {

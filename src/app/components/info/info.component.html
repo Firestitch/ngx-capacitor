@@ -3,18 +3,38 @@
   <mat-dialog-content>
     <div *fsSkeleton="sections()">
       @for (section of sections(); track section.name) {
-        <div class="section">
-          <h3>{{ section.name }}</h3>
-          @if (section.note) {
-            <p class="small note">{{ section.note }}</p>
-          }
-          @for (row of section.rows; track $index) {
-            <fs-label-field>
-              <fs-label>{{ row.label }}</fs-label>
-              <span class="value">{{ row.value }}</span>
-            </fs-label-field>
-          }
-        </div>
+        <section class="section">
+          <div class="section-name">{{ section.name }}</div>
+          <div
+              class="card"
+              [class.lead]="!!section.title">
+            @if (section.title) {
+              <div class="title">{{ section.title }}</div>
+            }
+            @if (section.note) {
+              <div class="note">{{ section.note }}</div>
+            }
+            @for (row of section.rows; track $index) {
+              <div class="row">
+                <div class="label">{{ row.label }}</div>
+                <div class="value">
+                  @if (row.checksum) {
+                    <!-- The start of the checksum, as the managers list it; a tap shows all of it -->
+                    <button
+                        type="button"
+                        class="checksum"
+                        (click)="toggle(row.checksum)">
+                      {{ expanded().includes(row.checksum) ? row.checksum : row.checksum.slice(0, checksumLength) }}
+                    </button>
+                  }
+                  @if (row.value) {
+                    <span>{{ row.value }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </section>
       }
     </div>
   </mat-dialog-content>

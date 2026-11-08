@@ -1,3 +1,4 @@
+export * from './capacitor-app-install';
 export * from './capacitor-info-row';
 export * from './capacitor-info-section';
 export * from './capacitor-status-bar-config';
