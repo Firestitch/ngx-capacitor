@@ -117,9 +117,10 @@ update: {
 
 7. Optional: report each phone's install to the app's backend. `FsCapacitorUpdate.install` (and
    `install$`) holds a `CapacitorAppInstall`: the device identifier, bundle id, platform, model
-   and OS, the store build (version, build number, build date, native level) and the code
-   running in it (`codeSource` store or update, its version, checksum and build date), plus the
-   last check's result. It is read once the launch's check ends, again whenever a later check
+   and maker, OS and web view version, the store build (version, build number, build date,
+   native level), the code running in it (`codeSource` store or update, its version, checksum
+   and build date), an update downloaded and waiting for the next launch (its version and
+   checksum), plus the last check's result. It is read once the launch's check ends, again whenever a later check
    changes it, and once at the start while updates are off. Each phone read is caught on its
    own, so a value the phone cannot give is null and nothing throws. Post it while someone is
    signed in, quietly, and drop any failure: the next launch sends it again.

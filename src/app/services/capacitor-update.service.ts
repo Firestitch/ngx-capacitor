@@ -681,11 +681,12 @@ export class FsCapacitorUpdate {
       device: this._native$(() => Device.getInfo()),
       deviceId: this._native$(() => Device.getId()),
       current: updater ? this._native$(() => CapacitorUpdater.current()) : of(null),
+      waiting: updater ? this._waitingBundle$() : of(null),
       build: this._asset$('assets/build.json'),
       native: this._asset$('assets/native.json'),
     })
       .pipe(
-        map(({ device, deviceId, current, build, native }): CapacitorAppInstall | null => {
+        map(({ device, deviceId, current, waiting, build, native }): CapacitorAppInstall | null => {
           const platform = this.platform;
           if (!deviceId?.identifier || !this.bundleIdentifier || (platform !== 'ios' && platform !== 'android')) {
             return null;
@@ -703,7 +704,9 @@ export class FsCapacitorUpdate {
             bundleId: this.bundleIdentifier,
             platform,
             model: device?.model || null,
+            manufacturer: device?.manufacturer || null,
             osVersion: device?.osVersion || null,
+            webViewVersion: device?.webViewVersion || null,
             storeVersion: this.version || null,
             storeBuild: Number.isFinite(this.buildNumber) ? String(this.buildNumber) : null,
             storeBuildDate: builtin?.build ?? null,
@@ -712,10 +715,26 @@ export class FsCapacitorUpdate {
             codeVersion: build?.version || update?.version.split('+')[0] || null,
             codeChecksum: update ? (update.checksum || update.version.split('+')[1] || null) : null,
             codeBuildDate: build?.date ?? null,
+            codeWaitingVersion: waiting ? waiting.version.split('+')[0] || null : null,
+            codeWaitingChecksum: waiting ? (waiting.checksum || waiting.version.split('+')[1] || null) : null,
             lastCheckResult: result && result !== 'Checking' ? result : null,
           };
         }),
         catchError(() => of(null)),
+      );
+  }
+
+  // The update left waiting for the next launch, while it is still on the phone; null when none
+  private _waitingBundle$(): Observable<BundleInfo | null> {
+    const id = localStorage.getItem(WAITING_KEY);
+    if (!id) {
+      return of(null);
+    }
+
+    return this._native$(() => CapacitorUpdater.list())
+      .pipe(
+        map((list) => list?.bundles
+          .find((info) => info.id === id && (info.status === 'success' || info.status === 'pending')) || null),
       );
   }
 

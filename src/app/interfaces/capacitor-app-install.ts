@@ -11,7 +11,11 @@ export interface CapacitorAppInstall {
   platform: 'ios' | 'android';
   /** The phone's model, iPhone15,2 */
   model: string | null;
+  /** The phone's maker, Apple or samsung, as its operating system names it */
+  manufacturer: string | null;
   osVersion: string | null;
+  /** The browser engine the app runs in; on Android it updates apart from the operating system */
+  webViewVersion: string | null;
   /** The store build's version, 4.0.1 */
   storeVersion: string | null;
   /** The store build's number, 11290 */
@@ -28,6 +32,10 @@ export interface CapacitorAppInstall {
   codeChecksum: string | null;
   /** When the running code was built, ISO 8601 */
   codeBuildDate: string | null;
+  /** An update downloaded and waiting to go in at the next launch: its version; null when none waits */
+  codeWaitingVersion: string | null;
+  /** The waiting update's checksum, as the managers list it */
+  codeWaitingChecksum: string | null;
   /** What the updater's last finished check found, "Up to date: running 4.0.3 (checksum 3b90b85e702e)" */
   lastCheckResult: string | null;
 }
